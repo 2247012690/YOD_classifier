@@ -1,0 +1,2549 @@
+
+setwd("D:/2025年3.17")
+options(repos = c(CRAN = "https://mirrors.tuna.tsinghua.edu.cn/CRAN/"))
+install.packages("readxl")
+
+install.packages("xlsx")
+library(xlsx)
+install.packages("readxl")
+library(readxl)
+#0变量筛选boruta###########
+# 数据导入
+#读取数据
+setwd("C:/Users/易叁弎/Desktop/读研/NACC/初印象/1.22/lasso筛选变量")
+mydata <- read_excel("690YOD3.24.xlsx", na = c(""," ",NA))
+#将分类变量转换为因子类型
+mydata[, 4:40] <- lapply(mydata[, 4:40], factor)
+
+# 确保连续变量保持原始格式
+mydata[, c(1, 2,3)] <- lapply(mydata[, c(1, 2,3)], as.numeric)
+#设置随机种子
+set.seed(123)
+boruta_output <- Boruta(YOD ~ ., data=na.omit(mydata), pValue = 0.01, mcAdj = TRUE, doTrace = 2)
+summary(boruta_output)
+importance <- boruta_output$ImpHistory 
+importance
+plot(boruta_output, las = 2, xlab = '', main = 'Variable Importance')
+par(mfrow = c(1, 1), mar = c(9, 4,4, 2) + 0.5)#上移图形
+plot(boruta_output, las = 2, xlab = '', main = 'Variable Importance')
+#保存计算结果
+install.packages("openxlsx")
+library(openxlsx)
+
+write.csv(importance, 'Variable_Importance.csv', row.names = FALSE)
+1逻辑回归#####
+# 推荐切换到清华大学镜像
+options(repos = c(CRAN = "https://mirrors.tuna.tsinghua.edu.cn/CRAN/"))
+install.packages(c("withr", "generics", "tidyselect"))
+install.packages("dplyr")
+library(dplyr) #数据处理使用
+install.packages("data.table")
+library(data.table) #数据读取使用
+install.packages("caTools")
+library(caTools) #LR模型使用
+install.packages(c("plyr", "Rcpp"))
+install.packages("pROC")
+library(pROC) #绘图使用
+install.packages("ggplot2")
+library(ggplot2) #绘图使用
+install.packages("ggpubr")
+library(ggpubr) #绘图使用
+install.packages("ggprism")
+library(ggprism) #绘图使用
+
+install.packages("lattice")
+library(lattice)
+install.packages("caret")
+library(caret)
+data <- read_excel("train_data.xlsx", na = c(""," ",NA))
+# 设置随机种子以确保结果可重现
+set.seed(123)
+
+# 定义训练集和测试集的比例
+train_ratio <- 0.7
+
+# 随机划分数据集为训练集和测试集
+index <- sample(1:nrow(data), size = nrow(data) * train_ratio)
+train_data <- data[index, ]
+test_data <- data[-index, ]
+# 导出训练集
+write.xlsx(train_data, "train_data.xlsx", rowNames = FALSE)
+
+# 导出测试集
+write.xlsx(test_data, "test_data.xlsx", rowNames = FALSE)
+
+
+# 读取数据（复现读此代码）
+library(readxl)
+# 加载必要的包
+library(caret)
+library(pROC)
+library(ggplot2)
+library(dplyr)
+install.packages("randomForest")
+library(randomForest)
+install.packages("e1071")
+library(e1071)
+install.packages("xgboost")
+library(xgboost)
+install.packages("nnet")
+library(nnet)
+install.packages("kernlab")
+library(kernlab)
+library(readxl)
+train_data <- read_excel("all_train.xlsx", na = c("", " ", NA))
+test_data <- read_excel("all_test.xlsx", na = c("", " ", NA))
+## 确保目标变量 'YOD' 是因子
+train_data$YOD <- as.factor(train_data$YOD)
+test_data$YOD <- as.factor(test_data$YOD)
+
+
+# 将前五列转换为因子类型
+train_data[, 3:17] <- lapply(train_data[, 3:17], as.factor)
+test_data[, 3:17] <- lapply(test_data[, 3:17], as.factor)
+
+
+# 划分特征和目标变量
+X_train <- train_data[, -17]
+y_train <- factor(train_data[[17]])
+X_test <- test_data[, -17]
+y_test <- factor(test_data[[17]])
+# 定义交叉验证参数
+control <- trainControl(method = "cv",   # 使用交叉验证
+                        number = 10)     # 10 折交叉验证
+
+library(caret)
+
+library(caret)
+# 构建带正则化的逻辑回归模型（套索回归）
+set.seed(123) # 确保结果可复现
+log_model <- train(
+  x = x_train,
+  y = y_train,
+  method = "glmnet",    # 使用带正则化的广义线性模型
+  trControl = control,  # 交叉验证控制
+  tuneGrid = expand.grid(
+    alpha = c(0, 0.5, 1),  # alpha = 0: 岭回归, alpha = 1: 套索回归
+    lambda = seq(0.001, 0.1, by = 0.01) # 正则化强度
+  ),
+  metric = "ROC"        # 以AUC为优化目标
+)
+# 输出模型结果
+print(log_model)
+cat("Best Parameters:\n")
+print(log_model$bestTune)
+# 输出模型结果
+print(log_model)
+
+# 训练集预测
+lr_train_prob<- predict(log, newdata = train_data, type = "response")
+threshold <- 0.5  # 设置阈值
+train_predicted_classes <- ifelse(lr_train_prob >= threshold, 1, 0)
+head(lr_train_prob)
+
+
+
+
+# 计算混淆矩阵（训练集）
+confusion_matrix_train <- table(train_data$YOD, train_predicted_classes)
+# 绘制训练集混淆矩阵
+fourfoldplot(confusion_matrix_train, color = c("red", "green"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix - Training Data (Logistic)")
+
+
+# 计算准确率（训练集）
+accuracy_train <- sum(diag(confusion_matrix_train)) / sum(confusion_matrix_train)
+
+# 计算 Precision（训练集）
+precision_train <- confusion_matrix_train[2, 2] / sum(confusion_matrix_train[, 2])
+
+# 计算 Recall（训练集）
+recall_train <- confusion_matrix_train[2, 2] / sum(confusion_matrix_train[2, ])
+
+# 计算 F1 Score（训练集）
+f1_score_train <- 2 * (precision_train * recall_train) / (precision_train + recall_train)
+
+# 打印训练集指标
+cat("训练集混淆矩阵:\n", confusion_matrix_train, "\n")
+cat("训练集准确率 (Accuracy): ", accuracy_train, "\n")
+cat("训练集 Precision: ", precision_train, "\n")
+cat("训练集 Recall: ", recall_train, "\n")
+cat("训练集 F1 Score: ", f1_score_train, "\n")
+
+# 测试集预测
+lr_test_prob <- predict(log, newdata = test_data, type = "response")
+test_predicted_classes <- ifelse(lr_test_prob >= threshold, 1, 0)
+
+# 计算混淆矩阵（测试集）
+confusion_matrix_test <- table(test_data$YOD, test_predicted_classes)
+# 绘制测试集混淆矩阵
+fourfoldplot(confusion_matrix_test, color = c("red", "green"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix -Testing Data (Logistic)")
+
+# 计算准确率（测试集）
+accuracy_test <- sum(diag(confusion_matrix_test)) / sum(confusion_matrix_test)
+
+# 计算 Precision（测试集）
+precision_test <- confusion_matrix_test[2, 2] / sum(confusion_matrix_test[, 2])
+
+# 计算 Recall（测试集）
+recall_test <- confusion_matrix_test[2, 2] / sum(confusion_matrix_test[2, ])
+
+# 计算 F1 Score（测试集）
+f1_score_test <- 2 * (precision_test * recall_test) / (precision_test + recall_test)
+
+# 打印测试集指标
+cat("\n测试集混淆矩阵:\n", confusion_matrix_test, "\n")
+cat("测试集准确率 (Accuracy): ", accuracy_test, "\n")
+cat("测试集 Precision: ", precision_test, "\n")
+cat("测试集 Recall: ", recall_test, "\n")
+cat("测试集 F1 Score: ", f1_score_test, "\n")
+# 计算训练集ROC曲线和AUC
+
+####训练集
+train_data$Pred_int <- predict(log, newdata = train_data, type = "response")
+install.packages("pROC")
+library(pROC)
+roc_train_log <- roc(train_data$YOD, train_data$Pred_int, ci = TRUE)
+# 计算 AUC 置信区间
+ci_train <- ci.auc(roc_train_log)
+
+# 输出 AUC 和置信区间
+# 输出 AUC 和置信区间（训练集）
+print(paste0("AUC (95%CI): ", sprintf("%0.3f", roc_train_log$auc), 
+             " (", sprintf("%0.3f", ci_train[1]), " - ",
+             sprintf("%0.3f", ci_train[3]), ")"), quote = FALSE)
+
+
+###测试集
+
+test_data$Pred_int <- predict(log, newdata = test_data, type = "response")
+
+roc_test_log <- roc(test_data$YOD, test_data$Pred_int, ci = TRUE)
+# 计算 AUC 置信区间
+ci_test <- ci.auc(roc_test_log)
+print(paste0("AUC (95%CI): ", sprintf("%0.3f", roc_test_log$auc), 
+             " (", sprintf("%0.3f", ci_test[1]), " - ",
+             sprintf("%0.3f", ci_test[3]), ")"), quote = FALSE)
+
+
+# 绘制ROC曲线
+p1<-plot(roc_train_log, print.auc = TRUE, 
+         auc.polygon = TRUE, 
+         grid = c(0.1, 0.2), 
+         grid.col = c("green", "red"), 
+         max.auc.polygon = TRUE,
+         auc.polygon.col = "skyblue",
+         print.thres = TRUE,
+         main = "ROC Curve for Training Data (Logistic)",
+         col = "blue",  # ROC 曲线的颜色
+         lwd = 2)       # ROC 曲线的线宽
+p2<-plot(roc_test_log, print.auc = TRUE, 
+         auc.polygon = TRUE, 
+         grid = c(0.1, 0.2), 
+         grid.col = c("green", "red"), 
+         max.auc.polygon = TRUE,
+         auc.polygon.col = "skyblue",
+         print.thres = TRUE,
+         main = "ROC Curve for Testing Data (Logistic)",
+         col = "blue",  # ROC 曲线的颜色
+         lwd = 2)       # ROC 曲线的线宽
+#2随机森林####################################################################
+# 导入必要的库
+library(dplyr) #数据处理使用
+install.packages("data.table")
+library(data.table) #数据读取使用
+remove.packages("randomForest1")
+install.packages("randomForest")
+library(randomForest) #RF模型使用
+library(caret) # 调参和计算模型评价参数使用
+library(pROC) #绘图使用
+library(ggplot2) #绘图使用
+library(ggpubr) #绘图使用
+library(ggprism) #绘图使用
+train_data <- read_excel("train.xlsx", na = c("", " ", NA))
+test_data <- read_excel("test.xlsx", na = c("", " ", NA))
+
+# 将前五列转换为因子类型
+train_data[, 3:17] <- lapply(train_data[, 3:17], as.factor)
+test_data[, 3:17] <- lapply(test_data[, 3:17], as.factor)
+
+
+# 划分特征和目标变量
+X_train <- train_data[, -17]
+y_train <- factor(train_data[[17]])
+X_test <- test_data[, -17]
+y_test <- factor(test_data[[17]])
+# 创建随机森林分类模型
+First_rf <- randomForest(x = X_train, y = y_train)
+, ntree = 100
+# 输出默认参数下的模型性能
+print(First_rf)
+# 进行参数调优
+# 创建训练控制对象
+# 使用五折交叉验证
+ctrl <- trainControl(
+  method = "cv",  # 使用交叉验证
+  number =5      #10 折交叉验证
+)
+
+# 定义参数网格
+# 每棵树中用于分裂的特征数量，这里只是随便给的测试，主要为了介绍如何调参，并非最优选择。
+# 定义更全面的参数网格
+grid <- expand.grid(mtry = c(2,5, 10,15,20))
+
+library(randomForest)
+
+
+
+
+
+
+# 使用 caret 进行模型训练和调参
+rf_model <- train(
+  x = X_train,        # 确保 X_train 是标准数据框格式
+  y = y_train,        # 确保 y_train 是因子格式
+  method = "rf",      # 随机森林方法
+  trControl = ctrl,   # 控制参数
+  tuneGrid = grid     # 调参网格
+)
+
+# 输出最佳模型和参数
+print(rf_model)
+# 调整Caret没有提供的参数
+# 如果我们想调整的参数Caret没有提供，可以用下面的方式自己手动调参。
+# 用刚刚调参的最佳mtry值固定mtry
+grid <- expand.grid(mtry = c(2))  # 每棵树中用于分裂的特征数量
+
+# 定义一个空的列表用于存储模型
+modellist <- list()
+
+# 用刚刚调参的最佳mtry值固定mtry
+grid <- expand.grid(mtry = c(15))  # 每棵树中用于分裂的特征数量
+
+# 调整的参数是决策树的数量
+for (ntree in c(100,200,300)) {
+  set.seed(123)
+  fit <- train(x = X_train, y = y_train, method="rf", 
+               metric="Accuracy", tuneGrid=grid, 
+               trControl=ctrl, ntree=ntree)
+  key <- toString(ntree)  # 将ntree转为字符，作为键
+  modellist[[key]] <- fit  # 将模型结果存入modellist
+}
+
+# 打印模型列表以查看结果
+print(modellist)
+
+
+# compare results
+results <- resamples(modellist)
+# 输出最佳模型和参数
+summary(results)
+# 使用最佳参数训练最终模型
+rf1 <- randomForest(x = X_train, y = y_train,mtry = 15,ntree =300, maxnodes = 18,nodesize = 20)
+# 输出最终模型
+rf1
+# 提取模型调参结果
+rf_tuning_results <- rf_model$results
+
+# 绘制 ntree 和 mtry 对准确度的影响
+ggplot(rf_tuning_results, aes(x = factor(mtry), y = Accuracy, group = factor(ntree), color = factor(ntree))) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Effect of mtry and ntree on Model Accuracy",
+       x = "mtry (Number of Features)",
+       y = "Accuracy",
+       color = "ntree (Number of Trees)") +
+  theme_minimal() +
+  theme(legend.position = "top")
+# 使用调参结果创建热图
+ggplot(rf_tuning_results, aes(x = factor(mtry), y = factor(ntree), fill = Accuracy)) +
+  geom_tile() +
+  labs(title = "Hyperparameter Tuning Heatmap - Accuracy",
+       x = "mtry (Number of Features)",
+       y = "ntree (Number of Trees)",
+       fill = "Accuracy") +
+  scale_fill_gradient(low = "white", high = "blue") +
+  theme_minimal() +
+  theme(axis.title = element_text(size = 12),
+        axis.text = element_text(size = 10),
+        title = element_text(size = 14))
+ggplot(rf_tuning_results, aes(x = factor(mtry), y = Accuracy, color = factor(ntree))) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~ factor(ntree)) +
+  labs(title = "Accuracy vs mtry for Different ntree",
+       x = "mtry (Number of Features)",
+       y = "Accuracy",
+       color = "ntree (Number of Trees)") +
+  theme_minimal() +
+  theme(legend.position = "top",
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 10),
+        title = element_text(size = 14))
+# 比较模型性能
+results <- resamples(modellist)
+
+# 输出结果摘要
+summary(results)
+
+# 绘制比较图
+bwplot(results)
+
+
+
+# 训练集预测
+# 训练集预测
+train_predictions_rf <- predict(rf1, newdata = X_train, type = "response")
+
+# 训练集混淆矩阵
+confusion_matrix_train_rf <- table(y_train, train_predictions_rf)
+
+# 训练集性能指标
+accuracy_train_rf <- sum(diag(confusion_matrix_train_rf)) / sum(confusion_matrix_train_rf)  # 准确率
+precision_train_rf <- confusion_matrix_train_rf[2, 2] / sum(confusion_matrix_train_rf[, 2])  # 精确率
+recall_train_rf <- confusion_matrix_train_rf[2, 2] / sum(confusion_matrix_train_rf[2, ])    # 召回率
+f1_score_train_rf <- 2 * (precision_train_rf * recall_train_rf) / (precision_train_rf + recall_train_rf)  # F1 分数
+
+# 输出结果
+cat("训练集混淆矩阵 (随机森林):\n")
+print(confusion_matrix_train_rf)
+train_predictions_rf <- predict(rf1, newdata = X_train, type = "response")
+confusion_matrix_train_rf <- table(y_train, train_predictions_rf)
+accuracy_train_rf <- sum(diag(confusion_matrix_train_rf)) / sum(confusion_matrix_train_rf)
+precision_train_rf <- confusion_matrix_train_rf[2, 2] / sum(confusion_matrix_train_rf[, 2])
+recall_train_rf <- confusion_matrix_train_rf[2, 2] / sum(confusion_matrix_train_rf[2, ])
+f1_score_train_rf <- 2 * (precision_train_rf * recall_train_rf) / (precision_train_rf + recall_train_rf)
+
+cat("训练集混淆矩阵 (随机森林):\n", confusion_matrix_train_rf, "\n")
+cat("训练集准确率 (随机森林): ", accuracy_train_rf, "\n")
+cat("训练集 Precision (随机森林): ", precision_train_rf, "\n")
+cat("训练集 Recall (随机森林): ", recall_train_rf, "\n")
+cat("训练集 F1 Score (随机森林): ", f1_score_train_rf, "\n")
+# 测试集预测
+test_predictions_rf <- predict(rf1, newdata = X_test, type = "response")
+
+confusion_matrix_test_rf <- table(y_test, test_predictions_rf)
+accuracy_test_rf <- sum(diag(confusion_matrix_test_rf)) / sum(confusion_matrix_test_rf)
+precision_test_rf <- confusion_matrix_test_rf[2, 2] / sum(confusion_matrix_test_rf[, 2])
+recall_test_rf <- confusion_matrix_test_rf[2, 2] / sum(confusion_matrix_test_rf[2, ])
+f1_score_test_rf <- 2 * (precision_test_rf * recall_test_rf) / (precision_test_rf + recall_test_rf)
+
+cat("\n测试集混淆矩阵 (随机森林):\n", confusion_matrix_test_rf, "\n")
+cat("测试集准确率 (随机森林): ", accuracy_test_rf, "\n")
+cat("测试集 Precision (随机森林): ", precision_test_rf, "\n")
+cat("测试集 Recall (随机森林): ", recall_test_rf, "\n")
+cat("测试集 F1 Score (随机森林): ", f1_score_test_rf, "\n")
+
+
+# 绘制测试集混淆矩阵
+fourfoldplot(confusion_matrix_test_rf, color = c("red", "green"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix - Testing Data (RF)")
+
+# 计算训练集和测试集的ROC曲线和AUC
+# 训练集的预测概率（如果是分类任务，需预测概率而非类别）
+train_prob_rf <- predict(rf1, newdata = X_train, type = "prob")[, 2]  # 获取属于类别1的概率
+
+# 测试集的预测概率
+test_prob_rf <- predict(rf1, newdata = X_test, type = "prob")[, 2]  # 获取属于类别1的概率
+
+
+
+
+roc_train_rf <- roc(y_train, train_prob_rf, ci = TRUE)
+ci_train_rf <- ci.auc(roc_train_rf)
+print(paste0("AUC (训练集, 随机森林): ", sprintf("%0.3f", roc_train_rf$auc), 
+             " (", sprintf("%0.3f", ci_train_rf[1]), " - ",
+             sprintf("%0.3f", ci_train_rf[3]), ")"), quote = FALSE)
+
+
+roc_test_rf <- roc(y_test, test_prob_rf, ci = TRUE)
+ci_test_rf <- ci.auc(roc_test_rf)
+print(paste0("AUC (测试集, 随机森林): ", sprintf("%0.3f", roc_test_rf$auc), 
+             " (", sprintf("%0.3f", ci_test_rf[1]), " - ",
+             sprintf("%0.3f", ci_test_rf[3]), ")"), quote = FALSE)
+
+# 绘制ROC曲线
+plot(roc_train_rf, print.auc = TRUE, 
+     auc.polygon = TRUE, 
+     grid = c(0.1, 0.2), 
+     grid.col = c("green", "red"), 
+     max.auc.polygon = TRUE,
+     auc.polygon.col = "skyblue",
+     print.thres = TRUE,
+     main = "ROC Curve for Training Data (RF)",
+     col = "blue",  
+     lwd = 2)       
+
+plot(roc_test_rf, print.auc = TRUE, 
+     auc.polygon = TRUE, 
+     grid = c(0.1, 0.2), 
+     grid.col = c("green", "red"), 
+     max.auc.polygon = TRUE,
+     auc.polygon.col = "skyblue",
+     print.thres = TRUE,
+     main = "ROC Curve for Testing Data (RF)",
+     col = "blue",  
+     lwd = 2)
+
+#3支持向量机,独热编码######################################################
+# 导入必要的包,没有安装的可以先安装一下
+library(dplyr) #数据处理使用
+library(data.table) #数据读取使用
+install.packages("e1071")
+library(e1071) #SVM模型使用
+install.packages("lattice")
+library(caret) # 调参和计算模型评价参数使用
+install.packages("pROC")
+library(pROC) #绘图使用
+library(ggplot2) #绘图使用
+library(ggpubr) #绘图使用
+library(ggprism) #绘图使用
+# 读取数据
+# 加载必要包
+library(readxl)
+library(e1071)    # SVM实现
+library(caret)    # 数据预处理和模型评估
+library(kernelshap)  # SHAP解释
+
+# 1. 数据加载与预处理 ----
+# 读取数据
+train_data <- read_excel("train.xlsx", na = c("", " ", NA))
+test_data <- read_excel("test.xlsx", na = c("", " ", NA))
+
+
+# 2. 数据划分与标准化 ----
+# 划分特征和目标变量（假设第17列是目标变量）
+X_train <- train_data[, -17]
+y_train <- factor(train_data[[17]])
+X_test <- test_data[, -17]
+y_test <- factor(test_data[[17]])
+
+# 对特征变量进行独热编码
+X_train<- model.matrix(~ . - 1, data = X_train)  # 排除目标变量YOD
+X_test<- model.matrix(~ . - 1, data= X_test)    # 测试集特征编码
+
+X_train
+# 转换训练集和测试集目标变量
+y_train <- factor(y_train, levels = c(0, 1), labels = c("LOD", "YOD"))
+y_test <- factor(y_test, levels = c(0, 1), labels = c("LOD", "YOD"))
+y_train
+svm_model <- svm(x = X_train, y = y_train,probability = TRUE)
+
+# 参数调整
+# 创建参数网格
+param_grid <- expand.grid(
+  sigma = c(0.001,0.01,0.02,0.04,0.06,0.08,0.1),
+  C = c(0.1, 1, 3,5))
+# 定义交叉验证的控制参数,这里使用10折交叉验证
+ctrl <- trainControl(method = "cv", number = 10, verboseIter = FALSE)
+# 进行参数调节
+
+tuned_model <- caret::train(
+  x = X_train,  # 此时 X_train 是数据框
+  y = y_train,
+  method = "svmRadial",
+  tuneGrid = param_grid,
+  trControl = ctrl
+)
+
+# 输出最佳参数配置
+print(tuned_model)
+# 加载必要包
+library(caret)
+library(pROC)
+library(kernelshap)
+
+# 1. 用最优参数训练最终模型 ----
+final_svm <- caret::train(
+  x = X_train,
+  y = y_train,
+  method = "svmRadial",
+  tuneGrid = data.frame(sigma = 0.01, C = 5),
+  trControl = trainControl(method = "none", classProbs = TRUE),
+  metric = "Accuracy"
+)
+final_svm 
+# 2. 测试集性能评估 ----
+# 生成预测结果
+test_pred <- predict(final_svm, X_test)
+test_prob <- predict(final_svm, X_test, type = "prob")
+
+# 混淆矩阵（带置信区间）
+conf_matrix <- confusionMatrix(test_pred, y_test, mode = "prec_recall")
+print(conf_matrix)
+
+# ROC曲线与AUC值
+roc_obj <- roc(response = y_test, predictor = test_prob[, "1"])
+plot(roc_obj, main = "ROC Curve (Test Set)")
+auc_value <- auc(roc_obj)
+cat("Test AUC:", round(auc_value, 3), "\n")
+
+# 3. 模型解释（SHAP分析）----
+
+shap_pred_fun <- function(object, newdata) {
+  predict(object, newdata, type = "prob")[, "Positive"]  # 使用新因子水平名称
+}
+
+# 使用100个背景样本加速计算
+set.seed(123)
+bg_data <- X_train[sample(nrow(X_train), 482), ]
+
+# 计算SHAP值（取前50个样本解释）
+shap_values <- kernelshap(
+  final_svm$finalModel,
+  X = X_test[1:208, ], 
+  bg_X = bg_data,
+  pred_fun = shap_pred_fun
+)
+shap_values
+
+
+####SHAP可视化####
+shap_viz <- shapviz(shap_values,
+                    X_pred = train_data[1:482, -1], 
+                    interactions =TRUE) 
+
+#### 1. 条形图 - SHAP 特征重要性
+sv_importance(shap_viz, 
+              kind = "bar", 
+              show_numbers = FALSE, 
+              fill = "#ff6f61") + 
+  theme_bw() + 
+  ggtitle("SVM Feature Importance") + 
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", color = "black"))
+
+
+#### 2. 蜂群图 - 展示每个特征的 SHAP 值分布
+sv_importance(shap_viz, 
+              kind = "beeswarm", 
+              viridis_args = list(begin = 0.25, end = 0.85, option = "F"), 
+              show_numbers = FALSE) + 
+  ggtitle("SVM SHAP Values Distribution") + 
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", color = "black"))
+
+library(shapviz)
+library(ggplot2)
+install.packages("ggbeeswarm")
+library(ggbeeswarm)   # 提供 geom_beeswarm()
+#### 2. 构建 shapviz 对象 ####
+shap_viz <- shapviz(
+  object       = shap_values,
+  X_pred       = X_test[1:208, ],  # 与 kernelshap 的 X 保持一致
+  interactions = TRUE
+)
+
+#### 3. 条形图 — 平均 |SHAP| 重要性 ####
+sv_importance(
+  object       = shap_viz,
+  kind         = "bar",
+  show_numbers = FALSE,
+  fill         = "#ff6f61"
+) +
+  theme_bw() +
+  labs(
+    title = "SVM SHAP Feature Importance",
+    x     = "Mean |SHAP value|",
+    y     = "Feature"
+  ) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+#### 4. 蜂群图 — SHAP 值分布（紧凑版） ####
+# 4. 蜂群图 — SHAP 值分布（紧凑版） ####
+sv_importance(
+  object       = shap_viz,
+  kind         = "beeswarm",
+  show_numbers = FALSE,
+  size         = 0.9,    # 点的大小
+  alpha        = 0.8,    # 点的透明度
+  viridis_args = list(   # 颜色映射
+    begin  = 0.25,
+    end    = 0.85,
+    option = "F"
+  )
+) +
+  scale_color_gradient( low  = "steelblue",    # 深蓝
+                        high = "#ff6f61"    # 橙红
+  ) +
+  theme_bw() +
+  labs(
+    title = "SVM SHAP Beeswarm Plot",
+    x     = "SHAP value",
+    y     = "Feature",
+    color = "Feature value"
+  ) +
+  theme(
+    plot.title      = element_text(hjust = 0.5, face = "bold"),
+    legend.position = "right"
+  )
+
+#### 5. 瀑布图 — 单个样本（row_id = 1） ####
+#### 4. 瀑布图 - 单个数据点的 SHAP 值展示
+sv_waterfall(shap_viz, 
+             row_id =56,  # 假设查看第12行数据点
+             fill_colors = c("lightcoral", "lightblue")) + 
+  ggtitle("SHAP Waterfall") + 
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", color = "black"))
+
+#### 5. 力图 - 展示单个数据点的特征贡献
+#### 5. 力图 - 展示单个数据点的特征贡献
+sv_force(shap_viz, 
+         row_id = 56,  # 假设查看第56行数据点
+         size = 9, 
+         fill_colors = c("lightcoral", "lightblue")) + 
+  ggtitle("SHAP Force Plot") + 
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", color = "black"))
+
+sv_force(shap_viz, 
+         row_id =56,  # 假设查看第12行数据点
+         size =9) + 
+  ggtitle("SHAP Force Plot") + 
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", color = "black"))
+
+
+sv_waterfall(
+  object = shap_viz,
+  row_id =56
+) +
+  labs(
+    title = "SHAP Waterfall",
+    x     = "SHAP value"
+  ) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+#### 6. 力图 — 单个样本（row_id = 1） ####
+sv_force(
+  object = shap_viz,
+  row_id = 56
+) +
+  labs(title = "SHAP Force Plot") +
+  theme_void()
+# 如果想绘制多个样本，例如第10和第20个：
+# sv_waterfall(shap_viz, row_id = 10) + ...
+# sv_waterfall(shap_viz, row_id = 20) + ...
+
+#### 4. 力图（Force plot）— 直观展示正负特征贡献 ####
+# 第1个样本的力图
+sv_force(
+  object = shap_viz,
+  row_id = 50
+) +
+  labs(
+    title = "Sample 1 SHAP Force Plot"
+  ) +
+  theme_void()  # 力图一般不需要坐标轴
+
+##### 计算特征交互效应###################
+library(caret)
+
+
+# 1) 准备好 data.frame 版的训练特征
+X_train_df <- as.data.frame(X_train)
+Print(X_train_df)
+X_train_df
+# 2) 因子标签
+y_train_f <- factor(y_train, levels = c("LOD","YOD"))
+svm_model <- svm(x = X_train_df, y = y_train_f,probability = TRUE)
+
+# 保留训练时的列名
+train_cols <- colnames(X_train_df)
+
+# 定义改进后的预测函数
+svm_pred_iml <- function(model, newdata) {
+  # 将 newdata 转换为 data.frame
+  nd <- as.data.frame(newdata, stringsAsFactors = FALSE)
+  
+  # 修复列名或补齐缺失列
+  if (!all(train_cols %in% colnames(nd))) {
+    missing_cols <- setdiff(train_cols, colnames(nd))
+    for (col in missing_cols) {
+      nd[[col]] <- 0  # 为缺失列填补值
+    }
+  }
+  nd <- nd[, train_cols, drop = FALSE]  # 按训练列顺序排列
+  
+  # 预测概率
+  p <- predict(model, nd, probability = TRUE)
+  probs <- attr(p, "probabilities")
+  
+  # 提取“YOD”类概率
+  out <- probs[, "YOD", drop = TRUE]
+  if (any(is.na(out))) stop("NA in predicted probabilities")
+  return(as.numeric(out))
+}
+
+# 创建 iml::Predictor 对象
+mod_iml <- Predictor$new(
+  model            = svm_model,    # e1071::svm 对象
+  data             = X_train_df,   
+  y                = y_train_f,    
+  predict.function = svm_pred_iml, 
+  type             = "prob",       
+  class            = "YOD"         
+)
+install.packages("bitops")
+install.packages("RCurl")
+install.packages("shades")
+install.packages("httr")
+install.packages("vipor")
+install.packages("ggfittext")
+install.packages("lazyeval")
+install.packages("crayon")
+library(bitops)
+library(RCurl)
+library(shades)
+library(httr)
+library(vipor)
+library(ggfittext)
+library(lazyeval)
+library(crayon)
+# 计算全局交互强度
+ia <- Interaction$new(mod_iml)
+
+# 5. 绘制交互强度条形图
+plot(ia) +
+  ggtitle("Global Feature Interaction Strengths") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+# 显示交互效应
+ia$results %>% arrange(desc(.interaction)) %>% head()
+
+# 绘制交互作用图
+plot(ia)
+# 假设我们想要分析"AAGAB"与其他特征的交互作用
+interact_2way <- Interaction$new(mod_iml, feature = "Hypertension")
+
+# 显示前10个最强交互作用的特征
+interact_2way$results %>% arrange(desc(.interaction)) %>% top_n(10)
+
+# 绘制二元交互效应图
+plot(interact_2way)
+# 6. 针对单个特征（示例："NACCBMI"）计算两两交互
+interact_2way <- Interaction$new(mod_iml, feature = "Hypertension")
+
+# 7. 查看该特征与其他特征的前 10 强交互
+interact_2way$results %>%
+  arrange(desc(.interaction)) %>%
+  head(10)
+
+# 8. 绘制该特征的交互强度条形图
+plot(interact_2way) +
+  ggtitle("Top Interactions with WBW") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+plot(interact_2way) +
+  ggtitle("2-way interaction strength") +
+  theme_minimal(base_size = 14) +  # 使用简洁主题并调整基础字体大小
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 16),  # 标题居中，加粗并调整大小
+    axis.title = element_text(face = "bold"),  # 加粗坐标轴标题
+    axis.text = element_text(color = "gray30"),  # 调整坐标轴文本颜色
+    panel.grid.major = element_line(color = "gray80"),  # 调整主网格线颜色
+    panel.grid.minor = element_blank()  # 隐藏次网格线
+  ) +
+  scale_fill_gradient(low = "#74add1", high = "#d73027") +  # 渐变填充颜色
+  labs(
+    x = "Interaction Strength",  # 设置x轴标签
+    y = "Features",              # 设置y轴标签
+    fill = "Strength"            # 图例标题
+  )
+plot(interact_2way) +
+  ggtitle("Top Interactions with WBW") +
+  theme_minimal(base_size = 14) +  # 使用简洁主题并调整基础字体大小
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 16),  # 标题居中，加粗并调整大小
+    axis.title = element_text(face = "bold"),  # 加粗坐标轴标题
+    axis.text = element_text(color = "gray30"),  # 调整坐标轴文本颜色
+    panel.grid.major = element_line(color = "gray80"),  # 调整主网格线颜色
+    panel.grid.minor = element_blank()  # 隐藏次网格线
+  ) +
+  scale_fill_gradient(low = "#74add1", high = "#d73027") +  # 渐变填充颜色
+  labs(
+    x = "2-way interaction strength",  # 替换x轴标签文字
+    y = "Features",                    # 设置y轴标签
+    fill = "Strength"                  # 图例标题
+  )
+
+# 使用 FeatureEffect 替代 Partial
+interaction_pdp <- FeatureEffect$new(
+  predictor = mod_iml,
+  feature = c("Hypertension", "WBW"),  # 特征组合
+  method = "pdp",            # 部分依赖图
+  grid.size = 20             # 网格大小
+)
+plot(interaction_pdp)
+
+#
+plot(interaction_pdp) +
+scale_color_manual(values = c("red", "blue")) +   # 自定义线条颜色
+  scale_fill_gradient(low = "lightblue", high = "lightcoral") +  # 使用渐变色填充
+  theme_minimal() +                                   # 应用简洁主题
+  theme(
+    text = element_text(size = 14),                  # 调整字体大小
+    axis.title = element_text(face = "bold"),        # 加粗坐标轴标题
+    panel.grid.major = element_line(color = "gray")  # 网格线颜色
+  )
+
+# 使用调参结果创建热图
+ggplot(svm_tuning_results, aes(x = factor(C), y = factor(sigma), fill = Accuracy)) +
+  geom_tile() +
+  labs(title = "Hyperparameter Tuning Heatmap - Accuracy",
+       x = "C (Cost)",
+       y = "Sigma (Gamma)",
+       fill = "Accuracy") +
+  scale_fill_gradient(low = "white", high = "blue") +
+  theme_minimal() +
+  theme(axis.title = element_text(size = 12),
+        axis.text = element_text(size = 10),
+        title = element_text(size = 14))
+# 绘制准确率与 C 和 sigma 的关系
+ggplot(svm_tuning_results, aes(x = factor(C), y = Accuracy, color = factor(sigma))) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Accuracy vs C and Sigma",
+       x = "C (Cost)",
+       y = "Accuracy",
+       color = "Sigma (Gamma)") +
+  theme_minimal() +
+  theme(legend.position = "top",
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 10),
+        title = element_text(size = 14))
+# 绘制 AUC 和 F1 score 的变化趋势
+ggplot(svm_tuning_results, aes(x = factor(C), y = AUC, color = factor(sigma))) +
+  geom_line() +
+  geom_point() +
+  labs(title = "AUC vs C and Sigma",
+       x = "C (Cost)",
+       y = "AUC",
+       color = "Sigma (Gamma)") +
+  theme_minimal() +
+  theme(legend.position = "top",
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 10),
+        title = element_text(size = 14))
+# 使用 facet_wrap 展示不同 C 和 sigma 值对准确率的影响
+ggplot(svm_tuning_results, aes(x = factor(C), y = Accuracy, color = factor(sigma))) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~ factor(sigma)) +
+  labs(title = "Accuracy vs C and Sigma for Different Models",
+       x = "C (Cost)",
+       y = "Accuracy",
+       color = "Sigma (Gamma)") +
+  theme_minimal() +
+  theme(legend.position = "top",
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 10),
+        title = element_text(size = 14))
+
+
+# 绘制调参结果
+ggplot(svm_tuning_results, aes(x = C, y = Accuracy, color = as.factor(sigma), group = sigma)) +
+  geom_line() +
+  geom_point(size = 3) +
+  labs(
+    title = "SVM Tuning Results",
+    x = "Regularization Parameter (C)",
+    y = "Accuracy",
+    color = "Sigma"
+  ) +
+  theme_minimal()
+# 在训练集和测试集上进行预测
+
+
+
+train_prob_svm  <- predict(svm_final_model, newdata =X_train, probability = TRUE)
+test_prob_svm  <- predict(svm_final_model, newdata = X_test, probability = TRUE)
+# 提取概率值
+train_prob_svm_class1 <- attr(train_prob_svm, "probabilities")[, "1"]
+test_prob_svm_class1 <- attr(test_prob_svm, "probabilities")[, "1"]
+
+
+# 创建训练集和测试集的校正数据框
+train_cal_data <- data.frame(
+  outcome = y_train,
+  predictions = train_prob_svm_class1
+)
+
+test_cal_data <- data.frame(
+  outcome = y_test,
+  predictions = test_prob_svm_class1
+)
+# 对训练集进行 Hosmer-Lemeshow 检验并提取校准数据
+# 加载必要的包
+install.packages("ResourceSelection")
+library(ResourceSelection)
+library(ggplot2)
+hl_train <- hoslem.test(train_data$outcome, train_data$predictions, g = 10)
+cal_train <- data.frame(
+  group = 1:10,
+  observed = hl_train$observed[, 2] / rowSums(hl_train$observed),  # 观测比例
+  predicted = hl_train$expected[, 2] / rowSums(hl_train$expected) # 预测比例
+)
+
+# 查看前几个概率值
+head(train_prob_svm_class1)
+
+
+
+
+
+# 计算 ROC 曲线
+roc_train_svm <- roc(y_train, train_prob_svm_class1, ci = TRUE)
+roc_test_svm <- roc(y_test, test_prob_svm_class1, ci = TRUE)
+
+# 计算 AUC 置信区间
+ci_train <- ci.auc(roc_train_svm)
+ci_test <- ci.auc(roc_test_svm)
+
+# 输出 AUC 和置信区间（训练集）
+print(paste0("AUC (95%CI): ", sprintf("%0.3f", roc_train_svm$auc), 
+             " (", sprintf("%0.3f", ci_train[1]), " - ",
+             sprintf("%0.3f", ci_train[3]), ")"), quote = FALSE)
+print(paste0("AUC (95%CI): ", sprintf("%0.3f", roc_test_svm$auc), 
+             " (", sprintf("%0.3f", ci_test[1]), " - ",
+             sprintf("%0.3f", ci_test[3]), ")"), quote = FALSE)
+
+
+# 绘制ROC曲线
+plot(roc_train_svm, print.auc = TRUE, 
+     auc.polygon = TRUE, 
+     grid = c(0.1, 0.2), 
+     grid.col = c("green", "red"), 
+     max.auc.polygon = TRUE,
+     auc.polygon.col = "skyblue",
+     print.thres = TRUE,
+     main = "ROC Curve for Training Data（SVM）",
+     col = "blue",  # ROC 曲线的颜色
+     lwd = 2)       # ROC 曲线的线宽
+plot(roc_test_svm, print.auc = TRUE, 
+     auc.polygon = TRUE, 
+     grid = c(0.1, 0.2), 
+     grid.col = c("green", "red"), 
+     max.auc.polygon = TRUE,
+     auc.polygon.col = "skyblue",
+     print.thres = TRUE,
+     main = "ROC Curve for Testing Data（SVM）",
+     col = "blue",  # ROC 曲线的颜色
+     lwd = 2)       # ROC 曲线的线宽
+
+
+# 计算评价模型指标。训练集
+# 安装并加载决策曲线分析包
+install.packages("rmda")
+library(rmda)
+
+# 将因子型目标变量转换为数值型（0/1）
+y_train_num <- as.numeric(as.character(y_train))
+y_test_num <- as.numeric(as.character(y_test))
+
+# 创建训练集DCA数据框
+train_dca_data <- data.frame(
+  outcome = y_train_num,
+  svm_prob = train_prob_svm_class1
+)
+
+# 创建测试集DCA数据框
+test_dca_data <- data.frame(
+  outcome = y_test_num,
+  svm_prob = test_prob_svm_class1
+)
+dca_train <- decision_curve(
+  outcome ~ svm_prob,
+  data = train_dca_data,
+  family = binomial(link = "logit"),
+  thresholds = seq(0, 1, by = 0.01)
+)
+
+dca_test <- decision_curve(
+  outcome ~ svm_prob,
+  data = test_dca_data,
+  family = binomial(link = "logit"),
+  thresholds = seq(0, 1, by = 0.01)
+)
+
+combined_dca <- list(train = dca_train, test = dca_test)
+
+plot_decision_curve(combined_dca, curve.names = c("Train", "Test"))
+
+# 生成决策曲线图，应用主题修改
+# 绘制决策曲线图，并不绘制默认图例
+plot_decision_curve(
+  combined_dca,
+  curve.names = c("SVM Train", "SVM Test"),
+  col = c("#4DAF4A", "#984EA3"),  # 专业的红色和蓝色
+  lty = c(1, 1),                # 实线 vs 虚线
+  lwd = 2,
+  main = "Decision Curve Analysis for SVM Model",
+  xlab = "Threshold Probability (%)", 
+  ylab = "Standardized Net Benefit",
+  cost.benefit.axis = TRUE,     # 移除成本收益轴
+  confidence.intervals = "default", # 移除置信区间
+  legend.position = "none"       # 关闭默认图例
+)
+# 绘制决策曲线图，并不绘制默认图例
+plot_decision_curve(
+  combined_dca,
+  curve.names = c("SVM Train", "SVM Test"),
+  col = c("tomato", "steelblue"),  # 专业的红色和蓝色
+  lty = c(1, 1),                # 实线 vs 虚线
+  lwd = 2,
+  main = "Decision Curve Analysis for SVM Model",
+  xlab = "Threshold Probability (%)", 
+  ylab = "Standardized Net Benefit",
+  cost.benefit.axis = TRUE,     # 移除成本收益轴
+  confidence.intervals = "default", # 移除置信区间
+  legend.position = "none"       # 关闭默认图例
+)
+
+# 使用数值坐标添加自定义图例，并调整图例间距使其更紧凑
+legend(x = 0.70, y = 1.05, 
+       legend = c("None", "All", "SVM Train", "SVM Test"),
+       col = c("gray", "black", "#4DAF4A", "#E41A1C"),
+       lty = c(1, 1, 1, 1),
+       lwd = 2,
+       cex = 1.3,       # 调整图例中文本大小
+       seg.len =1.5,     # 调整线段长度，默认约为2
+       y.intersp = 1.2, # 调整垂直间距（默认约为1）
+       x.intersp = 0.8, # 调整水平间距（默认约为1）
+       bty = "n")       # 取消图例边框
+# 绘制训练集临床影响曲线
+plot_clinical_impact(
+  dca_train,
+  col = "#E41A1C",   # 训练集用红色线条
+  lty = 1,           # 实线
+  lwd = 2,           # 线条宽度
+  main = "Clinical Impact Curve for SVM Model",
+  xlab = "Threshold Probability (%)",
+  ylab = "Number of Patients Identified",
+  legend.position = "none"  # 移除默认图例
+)
+
+# 提取训练集和测试集的预测概率（注意：需要明确提取正类概率）
+train_prob_svm <- attr(predict(svm_final_model, newdata = X_train, probability = TRUE), "probabilities")[, "1"]
+test_prob_svm <- attr(predict(svm_final_model, newdata = X_test, probability = TRUE), "probabilities")[, "1"]
+
+library(caret)
+installsp
+library(riskRegression)
+# 7. 提取训练集和测试集上属于 YOD=1 的预测概率
+train_prob_svm <- attr(predict(svm_model, X_train, probability = TRUE),
+                       "probabilities")[, "1"]
+test_prob_svm  <- attr(predict(svm_model, X_test,  probability = TRUE),
+                       "probabilities")[, "1"]
+
+# 8. 在训练集上计算校准
+cal_train <- Score(
+  list("SVM" = train_prob_svm),
+  formula    = y_train ~ 1,
+  data       = data.frame(y_train),
+  metrics    = c("auc", "brier"),
+  summary    = c("risks", "IPA", "riskQuantile", "ibs"),
+  plots      = "calibration",
+  null.model = TRUE,
+  conf.int   = TRUE,
+  B          = 2000,
+  M          = 150
+)
+
+# 9. 绘制训练集校准曲线
+plotCalibration(
+  cal_train,
+  which = "SVM",
+  col   = "tomato",
+  xlab  = "Predicted Risk",
+  ylab  = "Observed Risk",
+  bars  = FALSE,
+  main  = "训练集校准曲线"
+)
+
+# 10. 在测试集上计算校准
+cal_test <- Score(
+  list("SVM" = test_prob_svm),
+  formula    = y_test ~ 1,
+  data       = data.frame(y_test),
+  metrics    = c("auc", "brier"),
+  summary    = c("risks", "IPA", "riskQuantile", "ibs"),
+  plots      = "calibration",
+  null.model = TRUE,
+  conf.int   = TRUE,
+  B          = 2000,
+  M          = 150
+)
+
+# 11. 绘制测试集校准曲线
+plotCalibration(
+  cal_test,
+  which = "SVM",
+  col   = "steelblue",
+  xlab  = "Predicted Risk",
+  ylab  = "Observed Risk",
+  bars  = FALSE,
+  main  = "测试集校准曲线"
+)
+
+par(mar = c(5, 5, 2, 2))  # 调整边距
+
+# 基础绘图
+plot(test_cal$midpoint, test_cal$Percent, 
+     xlim = c(0, 1), ylim = c(0, 1), 
+     xlab = "Predicted Probability", ylab = "Observed Probability",
+     cex.lab = 1.2, cex.axis = 1, pch = 16, col = "#2166AC")
+
+# 添加理想对角线
+abline(0, 1, lty = 2, lwd = 2, col = "#224444")
+print(head(train_cal))  # 查看数据结构
+str(train_cal)          # 检查列名和类型
+
+# 添加训练集校准曲线（虚线）
+lines(train_cal$midpoint, train_cal$Percent, 
+      type = "l", blwd = 3, lty = 3, col = "tomato")
+
+# 图例
+legend(0.6, 0.2, 
+       legend = c("Test Set", "Training Set", "Ideal"), 
+       col = c("#2166AC", "tomato", "#224444"), 
+       lty = c(1, 3, 2), lwd = c(3, 3, 2), bty = "n")
+
+# 计算训练集指标
+# 定义阈值
+threshold <- 0.5
+
+# 训练集的预测类别
+train_pred_class <- ifelse(train_prob_svm_class1 >= threshold, 1, 0)
+
+# 测试集的预测类别
+test_pred_class <- ifelse(test_prob_svm_class1 >= threshold, 1, 0)
+# 训练集混淆矩阵
+conf_matrix_train <- confusionMatrix(
+  factor(train_pred_class, levels = c(0, 1)),
+  factor(y_train, levels = c(0, 1))
+)
+
+# 测试集混淆矩阵
+conf_matrix_test <- confusionMatrix(
+  factor(test_pred_class, levels = c(0, 1)),
+  factor(y_test, levels = c(0, 1))
+)
+
+# 输出混淆矩阵
+cat("训练集混淆矩阵:\n")
+print(conf_matrix_train)
+
+cat("\n测试集混淆矩阵:\n")
+print(conf_matrix_test)
+
+# 绘制训练集混淆矩阵
+fourfoldplot(conf_matrix_train$table,
+             color = c("#4DAF4A", "#984EA3"),
+             conf.level = 0, 
+             margin = 1, 
+             main = "Confusion Matrix - Training Data (SVM)")
+
+# 绘制测试集混淆矩阵
+fourfoldplot(conf_matrix_test$table,
+             color = c("#4DAF4A", "#984EA3"),
+             conf.level = 0, 
+             margin = 1, 
+             main = "Confusion Matrix - Testing Data (SVM)")
+# 提取训练集指标
+train_accuracy <- conf_matrix_train$overall["Accuracy"]
+train_precision <- conf_matrix_train$byClass["Precision"]
+train_recall <- conf_matrix_train$byClass["Recall"]
+train_f1 <- conf_matrix_train$byClass["F1"]
+
+cat("训练集指标:\n")
+cat("Accuracy: ", train_accuracy, "\n")
+cat("Precision: ", train_precision, "\n")
+cat("Recall: ", train_recall, "\n")
+cat("F1-Score: ", train_f1, "\n")
+
+# 提取测试集指标
+test_accuracy <- conf_matrix_test$overall["Accuracy"]
+test_precision <- conf_matrix_test$byClass["Precision"]
+test_recall <- conf_matrix_test$byClass["Recall"]
+test_f1 <- conf_matrix_test$byClass["F1"]
+
+cat("\n测试集指标:\n")
+cat("Accuracy: ", test_accuracy, "\n")
+cat("Precision: ", test_precision, "\n")
+cat("Recall: ", test_recall, "\n")
+cat("F1-Score: ", test_f1, "\n")
+
+
+  #4xgboost-独热编码#####################################
+
+  library(dplyr) #数据处理使用
+  library(data.table) #数据读取使用
+  install.packages("xgboost")
+  library(xgboost) #模型使用
+  install.packages("Matrix")
+  library(Matrix) #模型数据处理使用
+  library(caret) # 调参和计算模型评价参数使用
+  library(pROC) #绘图使用
+  library(ggplot2) #绘图使用
+  library(ggpubr) #绘图使用
+  library(ggprism) #绘图使用
+  # 读取数据
+  # 读取数据
+  train_data <- read_excel("train.xlsx", na = c("", " ", NA))
+  test_data <- read_excel("test.xlsx", na = c("", " ", NA))
+  
+  # 将前五列转换为因子类型
+  train_data[, 3:17] <- lapply(train_data[, 3:17], as.factor)
+  test_data[, 3:17] <- lapply(test_data[, 3:17], as.factor)
+  
+  
+  # 划分特征和目标变量
+  X_train <- train_data[, -17]
+  y_train <- factor(train_data[[17]])
+  X_test <- test_data[, -17]
+  y_test <- factor(test_data[[17]])
+  # 对所有的因子变量进行独热编码
+  library(dplyr)
+  install.packages("modelr")
+  library(modelr)
+  
+  # 转换为数值型
+  #X_train <- as.matrix(X_train)
+  #X_test <- as.matrix(X_test)
+  # 将特征进行 one-hot 编码（数值化）
+  X_train_matrix <- model.matrix(~ . - 1, data = X_train)  # -1 是为了去掉截距项
+  X_test_matrix <- model.matrix(~ . - 1, data = X_test)
+  
+  # 转换为 xgboost 能接受的格式
+  dtrain <- xgb.DMatrix(data = X_train_matrix, label = as.numeric(y_train) - 1)
+  dtest <- xgb.DMatrix(data = X_test_matrix, label = as.numeric(y_test) - 1)
+  # 将特征和目标变量转换为DMatrix格式
+  install.packages("modelr")
+  library(xgboost)
+  dtrain <- xgb.DMatrix(data = as.matrix(X_train), label = as.numeric(factor(y_train)) - 1)
+  dtest <- xgb.DMatrix(data = as.matrix(X_test), label = as.numeric(factor(y_test)) - 1)
+  
+  # 设置XGBoost参数
+  params <- list(objective = "binary:logistic", eval_metric = "logloss", eta = 0.1, max_depth = 3)
+  # 设置迭代轮数（树的数量）
+  nrounds <- 100
+  # 训练XGBoost模型
+  xgb_model <- xgboost(params = params, data = dtrain, nrounds = nrounds)
+  
+  
+  
+  ##参数调整
+  # 将数据集转换为trainControl对象
+  ctrl <- trainControl(
+    method = "cv",   # 交叉验证
+    number = 10,     # 10折交叉验证
+    verboseIter = FALSE)
+  
+  
+  
+  # 设置参数网格
+  param_grid <- expand.grid(
+    nrounds = c(50,100), # 迭代轮数（nrounds）
+    max_depth = c(1,3,5), # 最大树深度（max_depth）
+    eta = c(0.05), # 学习率（eta）
+    gamma = c(0, 0.1), # 树分裂所需的最小损失减少值
+    colsample_bytree = c(0.8), # 特征子采样比例（colsample_bytree）
+    min_child_weight = c(1, 3), # 叶子节点的最小权重和（min_child_weight）
+    subsample = c(0.8) # 和样本子采样比例（subsample）
+  )
+  #使用train()函数进行参数调优
+  xgb_model <- train(
+    x = X_train,
+    y = y_train,
+    method = "xgbTree",
+    trControl = ctrl,
+    tuneGrid = param_grid)
+  
+  
+  
+  # 输出最佳参数配置
+  print(xgb_model$bestTune)
+  
+  
+  # 设置最佳XGBoost参数
+  params <- list(objective = "binary:logistic", eval_metric = "logloss", 
+                 eta = 0.05, 
+                 max_depth =3, 
+                 gamma = 0.1,
+                 colsample_bytree = 0.8,
+                 min_child_weight = 1,
+                 subsample = 0.8,
+                 alpha = 0.1,
+                 lambda = 1)
+  
+  # 训练模型
+  xgb_model_final <- xgb.train(params = params, data = dtrain, nrounds = 100)
+  xgb_model_final
+  
+  
+  library(ggplot2)
+  library(caret)
+  
+  # 获取参数调优的结果
+  xgb_results <- xgb_model$results
+  
+  
+  # 绘制最大深度（max_depth）和最小子样本权重（min_child_weight）对模型准确率的影响
+  ggplot(xgb_results, aes(x = factor(max_depth), y = Accuracy, color = factor(min_child_weight))) +
+    geom_line(aes(group = min_child_weight), size = 1) + 
+    geom_point(aes(shape = factor(min_child_weight)), size = 3) +
+    labs(title = "Tuning Hyperparameters for XGBoost Model - Accuracy",
+         x = "Max Depth",
+         y = "Accuracy",
+         color = "Min Child Weight",
+         shape = "Min Child Weight") +
+    theme_minimal() +
+    theme(legend.position = "top", 
+          axis.title = element_text(size = 12), 
+          axis.text = element_text(size = 10), 
+          title = element_text(size = 14))
+  
+  # 绘制学习率（eta）和最大深度（max_depth）对模型logloss的影响
+  ggplot(xgb_results, aes(x = factor(max_depth), y = logLoss, color = factor(eta))) +
+    geom_line(aes(group = eta), size = 1) + 
+    geom_point(aes(shape = factor(eta)), size = 3) +
+    labs(title = "Tuning Hyperparameters for XGBoost Model - Logloss",
+         x = "Max Depth",
+         y = "Logloss",
+         color = "Learning Rate (Eta)",
+         shape = "Learning Rate (Eta)") +
+    theme_minimal() +
+    theme(legend.position = "top", 
+          axis.title = element_text(size = 12), 
+          axis.text = element_text(size = 10), 
+          title = element_text(size = 14))
+  
+  # 绘制迭代轮数（nrounds）与最大深度（max_depth）对模型准确率的影响
+  ggplot(xgb_results, aes(x = factor(nrounds), y = Accuracy, color = factor(max_depth))) +
+    geom_line(aes(group = max_depth), size = 1) + 
+    geom_point(aes(shape = factor(max_depth)), size = 3) +
+    labs(title = "Tuning Hyperparameters for XGBoost Model - Accuracy vs Nrounds",
+         x = "Number of Rounds",
+         y = "Accuracy",
+         color = "Max Depth",
+         shape = "Max Depth") +
+    theme_minimal() +
+    theme(legend.position = "top", 
+          axis.title = element_text(size = 12), 
+          axis.text = element_text(size = 10), 
+          title = element_text(size = 14))
+  
+  # 在训练集上进行预测
+  xgb_train_prob <- predict(xgb_model_final, newdata = dtrain)
+  xgb_train_prob <- ifelse(xgb_train_prob > 0.5, 1, 0)
+  
+  # 在测试集上进行预测
+  xgb_test_prob <- predict(xgb_model_final, newdata = dtest)
+  xgb_test_prob <- ifelse(xgb_test_prob > 0.5, 1, 0)
+  
+  # 绘制训练集混淆矩阵
+  confusion_matrix_train <- table(y_train, xgb_train_prob)
+  fourfoldplot(confusion_matrix_train, color = c("red", "green"),
+               conf.level = 0, margin = 1, 
+               main = "Confusion Matrix - Training Data (XGBoost)")
+  
+  # 绘制测试集混淆矩阵
+  confusion_matrix_test <- table(y_test, xgb_test_prob)
+  fourfoldplot(confusion_matrix_test, color = c("red", "green"),
+               conf.level = 0, margin = 1, 
+               main = "Confusion Matrix - Testing Data (XGBoost)")
+  
+  # 训练集指标计算
+  train_accuracy <- sum(xgb_train_prob == y_train) / length(y_train)
+  train_precision <- posPredValue(as.factor(xgb_train_prob), as.factor(y_train), positive = "1")
+  train_recall <- sensitivity(as.factor(xgb_train_prob), as.factor(y_train), positive = "1")
+  train_f1 <- (2 * train_precision * train_recall) / (train_precision + train_recall)
+  # 测试集指标计算
+  test_accuracy <- sum(xgb_test_prob == y_test) / length(y_test)
+  test_precision <- posPredValue(as.factor(xgb_test_prob), as.factor(y_test), positive = "1")
+  test_recall <- sensitivity(as.factor(xgb_test_prob), as.factor(y_test), positive = "1")
+  test_f1 <- (2 * test_precision * test_recall) / (test_precision + test_recall)
+  
+  # 输出结果
+  cat("训练集指标:\n")
+  cat("Accuracy: ", train_accuracy, "\n")
+  cat("Precision: ", train_precision, "\n")
+  cat("Recall: ", train_recall, "\n")
+  cat("F1 Score: ", train_f1, "\n")
+  
+  cat("\n测试集指标:\n")
+  cat("Accuracy: ", test_accuracy, "\n")
+  cat("Precision: ", test_precision, "\n")
+  cat("Recall: ", test_recall, "\n")
+  cat("F1 Score: ", test_f1, "\n")
+  
+  
+  ## 计算预测概率训练集和测试集
+  xgb_train_prob <- predict(xgb_model_final, newdata = dtrain, type = "response")
+  xgb_test_prob <- predict(xgb_model_final, newdata = dtest, type = "response")
+  
+  # 计算 ROC 曲线
+  roc_train_xgb <- roc(y_train, xgb_train_prob, ci = TRUE)
+  roc_test_xgb <- roc(y_test, xgb_test_prob, ci = TRUE)
+  
+  # 计算 AUC 置信区间
+  ci_train <- ci.auc(roc_train_xgb)
+  ci_test <- ci.auc(roc_test_xgb)
+  
+  # 输出 AUC 和置信区间（训练集）
+  print(paste0("AUC (95%CI): ", sprintf("%0.3f", roc_train_xgb$auc), 
+               " (", sprintf("%0.3f", ci_train[1]), " - ",
+               sprintf("%0.3f", ci_train[3]), ")"), quote = FALSE)
+  print(paste0("AUC (95%CI): ", sprintf("%0.3f", roc_test_xgb$auc), 
+               " (", sprintf("%0.3f", ci_test[1]), " - ",
+               sprintf("%0.3f", ci_test[3]), ")"), quote = FALSE)
+  # 绘制ROC曲线
+  plot(roc_train_xgb, print.auc = TRUE, 
+       auc.polygon = TRUE, 
+       grid = c(0.1, 0.2), 
+       grid.col = c("green", "red"), 
+       max.auc.polygon = TRUE,
+       auc.polygon.col = "skyblue",
+       print.thres = TRUE,
+       main = "ROC Curve for Training Data（XGBoot）",
+       col = "blue",  # ROC 曲线的颜色
+       lwd = 2)       # ROC 曲线的线宽
+  plot(roc_test_xgb, print.auc = TRUE, 
+       auc.polygon = TRUE, 
+       grid = c(0.1, 0.2), 
+       grid.col = c("green", "red"), 
+       max.auc.polygon = TRUE,
+       auc.polygon.col = "skyblue",
+       print.thres = TRUE,
+       main = "ROC Curve for Testing Data（XGBoot）",
+       col = "blue",  # ROC 曲线的颜色
+       lwd = 2)       # ROC 曲线的线宽
+
+
+  #5朴素贝叶斯############################################
+  install.packages("ggplot2")
+  install.packages("pROC")
+  library(pROC)
+  library(caret)
+  # 读取数据
+ 
+  train_data <- read_excel("all_train.xlsx", na = c("", " ", NA))
+  test_data <- read_excel("all_test.xlsx", na = c("", " ", NA))
+  ## 确保目标变量 'YOD' 是因子
+  train_data$YOD <- as.factor(train_data$YOD)
+  test_data$YOD <- as.factor(test_data$YOD)
+  
+  
+  # 将前五列转换为因子类型
+  train_data[, 1:5] <- lapply(train_data[, 1:5], as.factor)
+  test_data[, 1:5] <- lapply(test_data[, 1:5], as.factor)
+  
+  
+  # 划分特征和目标变量
+  X_train <- train_data[, -1]
+  y_train <- factor(train_data[[1]])
+  X_test <- test_data[, -1]
+  y_test <- factor(test_data[[1]])
+  
+  library(e1071)  # 加载 e1071 库
+  
+  # 设置交叉验证参数
+  ctrl <- trainControl(method = "cv", number = 10)
+  
+  # 定义参数网格
+  # 定义参数网格
+  param_grid <- expand.grid(
+    laplace = seq(0, 1, by = 0.1),  # 贝叶斯估计中的拉普拉斯参数范围
+    usekernel = c(TRUE, FALSE),  # 是否使用核估计
+    adjust = c(TRUE, FALSE)  # 是否进行调整
+  )
+  # 使用 train() 函数进行参数调优
+  nb_model_cv <- train(
+    x = X_train, 
+    y = y_train, 
+    method = "naive_bayes",  # 使用 e1071 包中的贝叶斯分类算法
+    trControl = ctrl, 
+    tuneGrid = param_grid
+  )
+  # 输出最佳参数配置
+  print(nb_model_cv)
+  library(ggplot2)
+  library(caret)
+  
+  # 将训练结果存储在 data.frame 中
+  nb_results <- nb_model_cv$results
+  
+  # 绘制准确率与拉普拉斯平滑参数（laplace）以及是否使用核估计（usekernel）和调整（adjust）参数的关系
+  ggplot(nb_results, aes(x = laplace, y = Accuracy, color = factor(usekernel), shape = factor(adjust))) +
+    geom_line() + 
+    geom_point(size = 3) +
+    labs(title = "Tuning Hyperparameters for Naive Bayes Model",
+         x = "Laplace Parameter",
+         y = "Accuracy",
+         color = "Use Kernel",
+         shape = "Adjust") +
+    theme_minimal() +
+    scale_color_manual(values = c("red", "blue")) + 
+    theme(legend.position = "top") +
+    theme(axis.title = element_text(size = 12), 
+          axis.text = element_text(size = 10), 
+          title = element_text(size = 14))
+  
+  # 绘制 Kappa 值与拉普拉斯平滑参数（laplace）和其他参数的关系
+  ggplot(nb_results, aes(x = laplace, y = Kappa, color = factor(usekernel), shape = factor(adjust))) +
+    geom_line() + 
+    geom_point(size = 3) +
+    labs(title = "Tuning Hyperparameters for Naive Bayes Model - Kappa",
+         x = "Laplace Parameter",
+         y = "Kappa",
+         color = "Use Kernel",
+         shape = "Adjust") +
+    theme_minimal() +
+    scale_color_manual(values = c("red", "blue")) + 
+    theme(legend.position = "top") +
+    theme(axis.title = element_text(size = 12), 
+          axis.text = element_text(size = 10), 
+          title = element_text(size = 14))
+  
+  # 提取交叉验证的结果
+  cv_results <- nb_model_cv$results
+  
+  # 查看调参结果
+  head(cv_results)
+  
+  # 使用 ggplot2 绘制热图，展示 laplace 和 usekernel 对 Accuracy 的影响
+  ggplot(cv_results, aes(x = as.factor(laplace), y = as.factor(usekernel), fill = Accuracy)) +
+    geom_tile() +
+    scale_fill_gradient2(low = "red", high = "green", mid = "yellow", midpoint = 0.75) +
+    labs(title = "Hyperparameter Tuning for Naive Bayes Model",
+         x = "Laplace Parameter",
+         y = "Use Kernel",
+         fill = "Accuracy") +
+    theme_minimal()
+  # 使用 ggplot2 绘制热图，展示 laplace 和 usekernel 对 AUC 的影响
+  ggplot(cv_results, aes(x = as.factor(laplace), y = as.factor(usekernel), fill = ROC)) +
+    geom_tile() +
+    scale_fill_gradient2(low = "red", high = "green", mid = "yellow", midpoint = 0.75) +
+    labs(title = "Hyperparameter Tuning for Naive Bayes Model",
+         x = "Laplace Parameter",
+         y = "Use Kernel",
+         fill = "AUC") +
+    theme_minimal()
+  
+  
+  # 使用最佳参数训练模型
+  # 使用最佳参数训练模型
+  best_nb_model <- naiveBayes(X_train, y_train, laplace = nb_model_cv$bestTune$laplace, usekernel = nb_model_cv$bestTune$usekernel, adjust = nb_model_cv$bestTune$adjust)
+  best_nb_model 
+  # 在测试集上进行预测
+  y_pred <- predict(best_nb_model, X_test)
+  
+  # 混淆矩阵
+  conf_matrix <- table(y_test, y_pred)
+  print(conf_matrix)
+  
+  # 分类报告
+  print(summary(y_pred))
+  ####训练集
+  train_nb_probs <- predict(best_nb_model, X_train, type = "raw", probability = TRUE)
+  test_nb_probs <- predict(best_nb_model, X_test, type = "raw", probability = TRUE)
+  # 提取正类的预测概率
+  train_positive_probs <- train_nb_probs[, "1"]
+  test_positive_probs <- test_nb_probs[, "1"]
+  # 计算 ROC 曲线
+  roc_train_nb <- roc(y_train, train_positive_probs, ci = TRUE)
+  roc_test_nb <- roc(y_test, test_positive_probs, ci = TRUE)
+  
+  # 计算 AUC 置信区间
+  ci_train <- ci.auc(roc_train_nb)
+  ci_test <- ci.auc(roc_test_nb)
+  # 输出 AUC 和置信区间
+  # 输出 AUC 和置信区间
+  print(paste0("AUC (95%CI): ", sprintf("%0.3f", roc_train_nb$auc), 
+               " (", sprintf("%0.3f", ci_train[1]), " - ",
+               sprintf("%0.3f", ci_train[3]), ")"), quote = FALSE)
+  
+  
+  print(paste0("AUC (95%CI): ", sprintf("%0.3f", roc_test_nb$auc), 
+               " (", sprintf("%0.3f", ci_test[1]), " - ",
+               sprintf("%0.3f", ci_test[3]), ")"), quote = FALSE)
+  
+  
+  # 绘制ROC曲线
+  plot(roc_train_nb, print.auc = TRUE, 
+       auc.polygon = TRUE, 
+       grid = c(0.1, 0.2), 
+       grid.col = c("green", "red"), 
+       max.auc.polygon = TRUE,
+       auc.polygon.col = "skyblue",
+       print.thres = TRUE,
+       main = "ROC Curve for Training Data（NB）",
+       col = "blue",  # ROC 曲线的颜色
+       lwd = 2)       # ROC 曲线的线宽
+  plot(roc_test_nb, print.auc = TRUE, 
+       auc.polygon = TRUE, 
+       grid = c(0.1, 0.2), 
+       grid.col = c("green", "red"), 
+       max.auc.polygon = TRUE,
+       auc.polygon.col = "skyblue",
+       print.thres = TRUE,
+       main = "ROC Curve for Testing Data（NB）",
+       col = "blue",  # ROC 曲线的颜色
+       lwd = 2)       # ROC 曲线的线宽
+  
+  # 贝叶斯分类
+  
+  train_nb_probs  <- predict(best_nb_model, X_train)
+  test_nb_probs  <- predict(best_nb_model, X_test)
+  
+  
+  # 创建训练集混淆矩阵
+  confusion_matrix_train <- table(Predicted = train_nb_probs, Actual = y_train)
+  fourfoldplot(confusion_matrix_train, color = c("red", "green"), 
+               conf.level = 0, margin = 1, 
+               main = "Confusion Matrix - Training Data (NB)")
+  
+  # 创建测试集混淆矩阵
+  confusion_matrix_test <- table(Predicted = test_nb_probs, Actual = y_test)
+  fourfoldplot(confusion_matrix_test, color = c("red", "green"), 
+               conf.level = 0, margin = 1, 
+               main = "Confusion Matrix - Testing Data (NB)")
+  # 混淆矩阵
+  conf_matrix_train <- table(y_train, train_nb_probs)
+  conf_matrix_test <- table(y_test, test_nb_probs)
+  
+  # 计算准确率
+  accuracy_train <- sum(diag(conf_matrix_train)) / sum(conf_matrix_train)
+  accuracy_test <- sum(diag(conf_matrix_test)) / sum(conf_matrix_test)
+  
+  # 计算 Precision
+  precision_train <- diag(conf_matrix_train) / colSums(conf_matrix_train)
+  precision_test <- diag(conf_matrix_test) / colSums(conf_matrix_test)
+  
+  # 计算 Recall
+  recall_train <- diag(conf_matrix_train) / rowSums(conf_matrix_train)
+  recall_test <- diag(conf_matrix_test) / rowSums(conf_matrix_test)
+  
+  # 计算 F1 Score
+  f1_score_train <- 2 * precision_train * recall_train / (precision_train + recall_train)
+  f1_score_test <- 2 * precision_test * recall_test / (precision_test + recall_test)
+  
+  # 打印结果
+  print("Train Set Metrics:")
+  print(paste("Accuracy:", accuracy_train))
+  print(paste("Precision (Positive):", precision_train[1]))
+  print(paste("Recall (Positive):", recall_train[1]))
+  print(paste("F1 Score (Positive):", f1_score_train[1]))
+  
+  print("Test Set Metrics:")
+  print(paste("Accuracy:", accuracy_test))
+  print(paste("Precision (Positive):", precision_test[1]))
+  print(paste("Recall (Positive):", recall_test[1]))
+  print(paste("F1 Score (Positive):", f1_score_test[1]))
+  
+  ###5.1NB模型dca##########
+ #6决策树模型######
+  # 加载必要的库
+  library(readxl)
+  library(xlsx)
+  library(caret)
+  library(rpart)
+  library(rpart.plot)
+  library(pROC)
+  
+  # 读取数据
+  # 读取数据
+  
+  train_data <- read_excel("all_train.xlsx", na = c("", " ", NA))
+  test_data <- read_excel("all_test.xlsx", na = c("", " ", NA))
+  ## 确保目标变量 'YOD' 是因子
+  train_data$YOD <- as.factor(train_data$YOD)
+  test_data$YOD <- as.factor(test_data$YOD)
+  
+  
+  # 将前五列转换为因子类型
+  train_data[, 1:5] <- lapply(train_data[, 1:5], as.factor)
+  test_data[, 1:5] <- lapply(test_data[, 1:5], as.factor)
+  
+  
+  # 划分特征和目标变量
+  X_train <- train_data[, -1]
+  y_train <- factor(train_data[[1]])
+  X_test <- test_data[, -1]
+  y_test <- factor(test_data[[1]])
+  
+  # 设置交叉验证参数
+  control <- trainControl(method = "cv", number = 10)
+  
+  # 设置参数网格
+  tune_grid <- expand.grid(cp = seq(0.001, 0.1, by = 0.005))
+  
+  # 训练决策树模型并调参
+  dt_model <- train(YOD ~ ., data = train_data, method = "rpart",
+                    trControl = control, tuneGrid = tune_grid)
+  dt_model
+  # 输出最佳模型参数
+  print(dt_model$bestTune)
+  
+  #################
+  
+  # 绘制调参结果
+  plot(dt_model)
+  # 可视化决策树
+  install.packages("rpart.plot")
+  install.packages("rpart")
+  library(rpart.plot)
+  library(rpart)
+  rpart.plot(dt_model$finalModel, type = 2, fallen.leaves = TRUE, extra = 101)
+  
+  # 使用最佳模型进行预测（训练集和测试集）
+  nb_train_predictions <- predict(dt_model, newdata = train_data)
+  nb_test_predictions <- predict(dt_model, newdata = test_data)
+  
+  # 计算混淆矩阵（训练集和测试集）
+  nb_confusion_matrix_train <- confusionMatrix(nb_train_predictions, train_data$YOD)
+  nb_confusion_matrix_test <- confusionMatrix(nb_test_predictions, test_data$YOD)
+  # 训练集混淆矩阵
+  conf_matrix_train <- table(Predicted = nb_train_predictions, Actual = train_data$YOD)
+  fourfoldplot(conf_matrix_train, color = c("red", "green"),
+               conf.level = 0, margin = 1, 
+               main = "Confusion Matrix - Training Data (DT)")
+  
+  # 测试集混淆矩阵
+  conf_matrix_test <- table(Predicted = nb_test_predictions, Actual = test_data$YOD)
+  fourfoldplot(conf_matrix_test, color = c("red", "green"),
+               conf.level = 0, margin = 1, 
+               main = "Confusion Matrix - Testing Data (DT)")
+  
+  # 打印混淆矩阵和模型性能指标（训练集和测试集）
+  print(confusion_matrix_train)
+  print(confusion_matrix_test)
+  
+  # 计算训练集和测试集的 ROC 曲线和 AUC
+  train_data$Pred_int <- predict(dt_model, newdata = train_data, type = "prob")[,2]
+  roc_train_dt <- roc(train_data$YOD, train_data$Pred_int, ci = TRUE)
+  ci_train <- ci.auc(roc_train_dt)
+  
+  test_data$Pred_int <- predict(dt_model, newdata = test_data, type = "prob")[,2]
+  roc_test_dt <- roc(test_data$YOD, test_data$Pred_int, ci = TRUE)
+  ci_test <- ci.auc(roc_test_dt)
+  
+  # 输出 AUC 和置信区间（训练集和测试集）
+  print(paste0("训练集 AUC (95%CI): ", sprintf("%0.3f", roc_train_dt$auc), 
+               " (", sprintf("%0.3f", ci_train[1]), " - ",
+               sprintf("%0.3f", ci_train[3]), ")"), quote = FALSE)
+  print(paste0("测试集 AUC (95%CI): ", sprintf("%0.3f", roc_test_dt$auc), 
+               " (", sprintf("%0.3f", ci_test[1]), " - ",
+               sprintf("%0.3f", ci_test[3]), ")"), quote = FALSE)
+  
+  # 绘制 ROC 曲线
+  plot(roc_train_dt, print.auc = TRUE, 
+       auc.polygon = TRUE, 
+       grid = c(0.1, 0.2), 
+       grid.col = c("green", "red"), 
+       max.auc.polygon = TRUE,
+       auc.polygon.col = "skyblue",
+       print.thres = TRUE,
+       main = "ROC Curve for Training Data (DT)",
+       col = "blue",  # ROC 曲线的颜色
+       lwd = 2)       # ROC 曲线的线宽
+  plot(roc_test_dt, print.auc = TRUE, 
+       auc.polygon = TRUE, 
+       grid = c(0.1, 0.2), 
+       grid.col = c("green", "red"), 
+       max.auc.polygon = TRUE,
+       auc.polygon.col = "skyblue",
+       print.thres = TRUE,
+       main = "ROC Curve for Testing Data (DT)",
+       col = "blue",  # ROC 曲线的颜色
+       lwd = 2)       # ROC 曲线的线宽
+  
+  # 计算四个评价指标
+  accuracy_train <- nb_confusion_matrix_train$overall["Accuracy"]
+  precision_train <- posPredValue(nb_train_predictions, train_data$YOD, positive = "1")
+  recall_train <- sensitivity(nb_train_predictions, train_data$YOD, positive = "1")
+  f1_train <- (2 * precision_train * recall_train) / (precision_train + recall_train)
+  
+  accuracy_test <- nb_confusion_matrix_test$overall["Accuracy"]
+  precision_test <- posPredValue(nb_test_predictions, test_data$YOD, positive = "1")
+  recall_test <- sensitivity(nb_test_predictions, test_data$YOD, positive = "1")
+  f1_test <- (2 * precision_test * recall_test) / (precision_test + recall_test)
+  
+  # 打印评价指标
+  cat("训练集评估指标：\n")
+  cat("Accuracy: ", accuracy_train, "\n")
+  cat("Precision: ", precision_train, "\n")
+  cat("Recall: ", recall_train, "\n")
+  cat("F1-score: ", f1_train, "\n")
+  
+  cat("测试集评估指标：\n")
+  cat("Accuracy: ", accuracy_test, "\n")
+  cat("Precision: ", precision_test, "\n")
+  cat("Recall: ", recall_test, "\n")
+  cat("F1-score: ", f1_test, "\n")
+  # 打印并绘制决策树
+  rpart.plot(dt_model$finalModel, main = "Decision Tree", extra = 102)
+  # 美化并绘制决策树
+  rpart.plot(dt_model$finalModel, type = 2, extra = 104, fallen.leaves = TRUE,
+             box.palette = "RdYlGn", shadow.col = "gray", nn = TRUE,
+             main = "Decision Tree for M_stage Prediction")
+  
+  #7AdaBoost模型#######
+  # 加载必要的库
+  library(readxl)
+  library(xlsx)
+  library(caret)
+  install.packages("rpart")
+  library(ada)
+  
+  train_data <- read_excel("all_train.xlsx", na = c("", " ", NA))
+  test_data <- read_excel("all_test.xlsx", na = c("", " ", NA))
+  
+  
+  
+  # 将前五列转换为因子类型
+  train_data[, 1:5] <- lapply(train_data[, 1:5], as.factor)
+  test_data[, 1:5] <- lapply(test_data[, 1:5], as.factor)
+  
+  
+  # 划分特征和目标变量
+  X_train <- train_data[, -1]
+  y_train <- factor(train_data[[1]])
+  X_test <- test_data[, -1]
+  y_test <- factor(test_data[[1]])
+  
+  
+  install.packages("mlbench")
+  
+  library(mlbench)
+  
+  # 创建并训练AdaBoost模型
+  ada_model <- ada(x = X_train, y = y_train, iter = 50, loss = "logistic")
+  
+  # 创建交叉验证控制对象
+  ctrl <- trainControl(
+    method = "cv",      # 使用交叉验证
+    number = 10,        # 10折交叉验证
+    verboseIter = TRUE  # 显示训练进度
+  )
+  
+  # 定义参数网格
+  param_grid <- expand.grid(
+    iter = c(100),          # 不同的迭代次数
+    maxdepth = c(1, 2),           # 最大树深
+    nu = c(0.1, 0.2)            # 学习率
+  )
+  
+  # 使用 caret 的 train 函数进行调参
+  ada_tuned <- train(
+    x = X_train,
+    y = y_train,
+    method = "ada",                 # 指定 AdaBoost 方法
+    trControl = ctrl,               # 指定交叉验证参数
+    tuneGrid = param_grid           # 指定调参网格
+  )
+  
+  ada_tuned
+  # 打印最佳参数和模型
+  print(ada_tuned$bestTune)
+  print(ada_tuned)
+  # 使用最佳参数训练最终模型
+  library(rpart)  # 确保 rpart 包已安装
+  
+  best_params <- ada_tuned$bestTune
+  
+  # 设置控制参数，特别是 maxdepth
+  control_params <- rpart.control(maxdepth = best_params$maxdepth)
+  # 训练最终模型
+  ada_model_final <- ada(
+    x = X_train,
+    y = y_train,
+    iter = best_params$iter,
+    nu = best_params$nu,
+    control = control_params,  # 指定控制参数
+    loss = "logistic"
+  )
+  # 检查最终模型
+  print(ada_model_final)
+  # 在训练集上进行预测
+  ada_train_predictions <- predict(ada_model_final, newdata = X_train, type = "vector")
+  ada_train_confusion <- table(y_train, ada_train_predictions)
+  
+  # 在测试集上进行预测
+  ada_test_predictions <- predict(ada_model_final, newdata = X_test, type = "vector")
+  ada_test_confusion <- table(y_test, ada_test_predictions)
+  
+  
+  # 计算混淆矩阵（训练集）
+  ada_confusion_matrix_train <- table(y_train, ada_train_predictions)
+  
+  
+  # 计算混淆矩阵（测试集）
+  ada_confusion_matrix_test <- table(y_test, ada_test_predictions)
+  
+  # 绘制训练集混淆矩阵图
+  fourfoldplot(ada_confusion_matrix_train , color = c("red", "green"),
+               conf.level = 0, margin = 1, 
+               main = "Confusion Matrix - Training Data (AdaBoost)")
+  
+  # 绘制测试集混淆矩阵图
+  fourfoldplot(ada_confusion_matrix_test , color = c("red", "green"),
+               conf.level = 0, margin = 1, 
+               main = "Confusion Matrix - Testing Data (AdaBoost)")
+  
+  # 计算准确率、精确率、召回率和 F1 分数（训练集）
+  accuracy_train <- sum(diag(ada_confusion_matrix_train)) / sum(ada_confusion_matrix_train)
+  precision_train <- ada_confusion_matrix_train[2, 2] / sum(ada_confusion_matrix_train[, 2])
+  recall_train <- ada_confusion_matrix_train[2, 2] / sum(ada_confusion_matrix_train[2, ])
+  f1_score_train <- 2 * (precision_train * recall_train) / (precision_train + recall_train)
+  
+  # 打印训练集指标
+  cat("训练集混淆矩阵:\n", confusion_matrix_train, "\n")
+  cat("训练集准确率 (Accuracy): ", accuracy_train, "\n")
+  cat("训练集 Precision: ", precision_train, "\n")
+  cat("训练集 Recall: ", recall_train, "\n")
+  cat("训练集 F1 Score: ", f1_score_train, "\n")
+  
+  
+  
+  # 计算准确率、精确率、召回率和 F1 分数（测试集）
+  accuracy_test <- sum(diag(ada_confusion_matrix_test)) / sum(ada_confusion_matrix_test)
+  precision_test <- ada_confusion_matrix_test[2, 2] / sum(ada_confusion_matrix_test[, 2])
+  recall_test <- ada_confusion_matrix_test[2, 2] / sum(ada_confusion_matrix_test[2, ])
+  f1_score_test <- 2 * (precision_test * recall_test) / (precision_test + recall_test)
+  
+  # 打印测试集指标
+  cat("\n测试集混淆矩阵:\n", confusion_matrix_test, "\n")
+  cat("测试集准确率 (Accuracy): ", accuracy_test, "\n")
+  cat("测试集 Precision: ", precision_test, "\n")
+  cat("测试集 Recall: ", recall_test, "\n")
+  cat("测试集 F1 Score: ", f1_score_test, "\n")
+  # 绘制训练集混淆矩阵
+  
+  
+  
+  # 计算训练集和测试集的 ROC 曲线和 AUC
+  train_data$Pred_int <- predict(ada_model_final, newdata = train_data, type = "prob")[,2]
+  roc_train_ada <- roc(train_data$YOD, train_data$Pred_int, ci = TRUE)
+  ci_train <- ci.auc(roc_train_ada)
+  
+  test_data$Pred_int <- predict(ada_model_final, newdata = test_data, type = "prob")[,2]
+  roc_test_ada <- roc(test_data$YOD, test_data$Pred_int, ci = TRUE)
+  ci_test <- ci.auc(roc_test_ada)
+  
+  # 输出 AUC 和置信区间（训练集和测试集）
+  print(paste0("训练集 AUC (95%CI): ", sprintf("%0.3f", roc_train_ada$auc), 
+               " (", sprintf("%0.3f", ci_train[1]), " - ",
+               sprintf("%0.3f", ci_train[3]), ")"), quote = FALSE)
+  print(paste0("测试集 AUC (95%CI): ", sprintf("%0.3f", roc_test_ada$auc), 
+               " (", sprintf("%0.3f", ci_test[1]), " - ",
+               sprintf("%0.3f", ci_test[3]), ")"), quote = FALSE)
+  
+  # 绘制 ROC 曲线
+  plot(roc_train_ada, print.auc = TRUE, 
+       auc.polygon = TRUE, 
+       grid = c(0.1, 0.2), 
+       grid.col = c("green", "red"), 
+       max.auc.polygon = TRUE,
+       auc.polygon.col = "skyblue",
+       print.thres = TRUE,
+       main = "ROC Curve for Training Data (AdaBoost)",
+       col = "blue",  # ROC 曲线的颜色
+       lwd = 2)       # ROC 曲线的线宽
+  plot(roc_test_ada, print.auc = TRUE, 
+       auc.polygon = TRUE, 
+       grid = c(0.1, 0.2), 
+       grid.col = c("green", "red"), 
+       max.auc.polygon = TRUE,
+       auc.polygon.col = "skyblue",
+       print.thres = TRUE,
+       main = "ROC Curve for Testing Data (AdaBoost)",
+       col = "blue",  # ROC 曲线的颜色
+       lwd = 2)       # ROC 曲线的线宽
+  #8knn######################################################################
+  # 导入所需的包
+  library(readxl)
+  library(class)
+  
+  # 使用knn算法进行训练
+  
+  # KNN Classifier
+  train_data <- read_excel("train.xlsx", na = c("", " ", NA))
+  test_data <- read_excel("test.xlsx", na = c("", " ", NA))
+  
+  # 将前五列转换为因子类型
+  train_data[, 3:17] <- lapply(train_data[, 3:17], as.factor)
+  test_data[, 3:17] <- lapply(test_data[, 3:17], as.factor)
+  
+  
+  # 划分特征和目标变量
+  X_train <- train_data[, -17]
+  y_train <- factor(train_data[[17]])
+  X_test <- test_data[, -17]
+  y_test <- factor(test_data[[17]])
+  
+  
+  # 10-fold cross validation was used, and tuning was done on all the next algorithms discussed here to avoid over-training the algorithms.
+  ctrl <- trainControl(method = "cv", verboseIter = FALSE, number =10)
+  knnFit <- train(YOD ~ ., 
+                  data = train_data, method = "knn", preProcess = c("center","scale"),
+                  trControl = ctrl , tuneGrid = expand.grid(k = seq(1, 20, 2)))
+  knnFit 
+  plot(knnFit)
+  # 使用训练好的模型进行预测
+  # 使用训练好的模型进行预测，输出概率
+  knn_test_prob <- predict(knnFit, newdata = test_data, type = "prob")[, 2]  # 提取正类概率
+  knn_train_prob <- predict(knnFit, newdata = train_data, type = "prob")[, 2]  # 提取正类概率
+  
+  # 检查预测概率
+  head(knn_test_prob)
+  head(knn_train_prob)
+  knn_test_prob <- predict(knnFit,newdata =  test_data)
+  knn_train_prob <- predict(knnFit, newdata = train_data)
+  head(knn_test_prob)
+  # 计算训练集的混淆矩阵
+  knn_confusion_matrix_train <- confusionMatrix(knn_train_prob, train_data$YOD)
+  print(knn_confusion_matrix_train)
+  # 获取混淆矩阵的频数部分
+  knn_confusion_matrix_train_values <- knn_confusion_matrix_train$table
+  
+  # 绘制混淆矩阵
+  fourfoldplot(knn_confusion_matrix_train_values, color = c("red", "green"),
+               conf.level = 0, margin = 1, 
+               main = "Confusion Matrix - Training Data (k-NN)")
+  
+  # 计算测试集的混淆矩阵
+  knn_confusion_matrix_test <- confusionMatrix(knn_test_prob, test_data$YOD)
+  print(knn_confusion_matrix_test)
+  # 获取混淆矩阵的频数部分
+  knn_confusion_matrix_test_values <- knn_confusion_matrix_test$table
+  fourfoldplot(knn_confusion_matrix_test_values, color = c("red", "green"),
+               conf.level = 0, margin = 1, 
+               main = "Confusion Matrix - Testing Data (k-NN)")
+  # 加载必要的包
+  install.packages("Metrics")
+  library(Metrics)
+  
+  
+  # 计算测试集的混淆矩阵，将 'Positive' 类别设置为 1
+  knn_test_conf_matrix <- confusionMatrix(data = knn_test_prob, reference = y_test, positive = "1")
+  
+  # 计算训练集的混淆矩阵，将 'Positive' 类别设置为 1
+  knn_train_conf_matrix <- confusionMatrix(data = knn_train_prob, reference = y_train, positive = "1")
+  
+  # 打印混淆矩阵
+  print(knn_train_conf_matrix )
+  print(knn_test_conf_matrix)
+  ###训练集
+  # 计算准确率
+  accuracy <- knn_train_conf_matrix$overall["Accuracy"]
+  print(paste("Accuracy:", accuracy))
+  
+  # 计算Precision
+  precision <- knn_train_conf_matrix$byClass["Pos Pred Value"]
+  print(paste("Precision:", precision))
+  
+  # 计算Recall
+  recall <- knn_train_conf_matrix$byClass["Sensitivity"]
+  print(paste("Recall:", recall))
+  
+  # 计算F1 Score
+  f1_score <- knn_train_conf_matrix$byClass["F1"]
+  print(paste("F1 Score:", f1_score))
+  ###测试集
+  # 计算准确率
+  accuracy <- knn_test_conf_matrix$overall["Accuracy"]
+  print(paste("Accuracy:", accuracy))
+  
+  # 计算Precision
+  precision <- knn_test_conf_matrix$byClass["Pos Pred Value"]
+  print(paste("Precision:", precision))
+  
+  # 计算Recall
+  recall <- knn_test_conf_matrix$byClass["Sensitivity"]
+  print(paste("Recall:", recall))
+  
+  # 计算F1 Score
+  f1_score <- knn_test_conf_matrix$byClass["F1"]
+  print(paste("F1 Score:", f1_score))
+  # 计算预测概率
+  # 获取训练集和测试集的预测概率
+  knn_train_probs <- predict(knnFit, X_train, type = "prob")
+  knn_test_probs <- predict(knnFit, X_test, type = "prob")
+  
+  knn_train_positive_probs <- knn_train_probs[, "1"]
+  knn_test_positive_probs <- knn_test_probs[, "1"]
+  
+  # 计算 AUC 置信区间
+  ci <- ci.auc(roc_train_nb)
+  ci <- ci.auc(roc_test_nb)
+  # 输出 AUC 和置信区间
+  
+  ####训练集
+  train_data$Pred_int <- predict(knnFit, newdata = train_data, type = "prob")
+  
+  roc_train_knn <- roc(train_data$YOD, train_data$Pred_int[,2], ci = TRUE)
+  
+  print(paste0("AUC (95%CI): ",sprintf("%0.3f",roc_train_knn$ci)[2],
+               " (",sprintf("%0.3f",roc_train_knn$ci)[1]," - ",
+               sprintf("%0.3f",roc_train_knn$ci)[3],")"),quote=F)
+  ###测试集
+  test_data$Pred_int <- predict(knnFit, newdata = test_data, type = "prob")
+  
+  roc_test_knn <- roc(test_data$YOD, test_data$Pred_int[,2], ci = TRUE)
+  
+  print(paste0("AUC (95%CI): ",sprintf("%0.3f",roc_test_knn$ci)[2],
+               " (",sprintf("%0.3f",roc_test_knn$ci)[1]," - ",
+               sprintf("%0.3f",roc_test_knn$ci)[3],")"),quote=F)
+  
+  
+  # 绘制ROC曲线
+  plot(roc_train_knn, print.auc = TRUE, 
+       auc.polygon = TRUE, 
+       grid = c(0.1, 0.2), 
+       grid.col = c("green", "red"), 
+       max.auc.polygon = TRUE,
+       auc.polygon.col = "skyblue",
+       print.thres = TRUE,
+       main = "ROC Curve for Training Data（k-NN）",
+       col = "blue",  # ROC 曲线的颜色
+       lwd = 2)       # ROC 曲线的线宽
+  plot(roc_test_knn, print.auc = TRUE, 
+       auc.polygon = TRUE, 
+       grid = c(0.1, 0.2), 
+       grid.col = c("green", "red"), 
+       max.auc.polygon = TRUE,
+       auc.polygon.col = "skyblue",
+       print.thres = TRUE,
+       main = "ROC Curve for Testing Data（k-NN）",
+       col = "blue",  # ROC 曲线的颜色
+       lwd = 2)       # ROC 曲线的线宽
+##9MLP################
+  # 读取数据
+  train_data <- read_excel("train.xlsx", na = c("", " ", NA))
+  test_data <- read_excel("test.xlsx", na = c("", " ", NA))
+  
+  # 将前五列转换为因子类型
+  train_data[, 3:17] <- lapply(train_data[, 3:17], as.factor)
+  test_data[, 3:17] <- lapply(test_data[, 3:17], as.factor)
+  
+  
+  # 划分特征和目标变量
+  X_train <- train_data[, -17]
+  y_train <- factor(train_data[[17]])
+  X_test <- test_data[, -17]
+  y_test <- factor(test_data[[17]])
+  install.packages("keras")
+  library(keras)  # 确保加载 keras 包
+  library(dplyr)  # 确保加载 dplyr 包
+  # 安装并加载 h2o 包（如果尚未安装）
+  if (!require(h2o)) {
+    install.packages("h2o")
+  }
+  
+  library(h2o)
+  
+  # 启动 h2o 集群
+  h2o.init()
+  
+  # 将数据框转换为 h2o 数据帧
+  X_train_h2o <- as.h2o(X_train)
+  y_train_h2o <- as.h2o(y_train)
+  X_test_h2o <- as.h2o(X_test)
+  y_test_h2o <- as.h2o(y_test)
+  
+  # 合并特征和目标变量为训练和测试数据集
+  train_h2o <- h2o.cbind(X_train_h2o, y_train_h2o)
+  test_h2o <- h2o.cbind(X_test_h2o, y_test_h2o)
+  
+  # 给目标变量列一个合适的名字
+  colnames(train_h2o)[ncol(train_h2o)] <- "YOD"
+  colnames(test_h2o)[ncol(test_h2o)] <- "YOD"
+  
+  # 划分特征和目标变量
+  response <- "YOD"
+  predictors <- setdiff(names(train_h2o), response)
+  # 确保目标变量是因子
+  train_h2o$YOD <- as.h2o(as.factor(as.vector(train_h2o$YOD)))
+  test_h2o$YOD <- as.h2o(as.factor(as.vector(test_h2o$YOD)))
+  # 将数据转换为 H2O 数据帧
+  train_h2o <- as.h2o(train_data)
+  test_h2o <- as.h2o(test_data)
+  
+  # 定义目标变量和特征变量
+  target <- "YOD"
+  features <- setdiff(names(train_h2o), target)
+  
+  
+  # 创建深度学习模型
+  # 创建深度学习模型
+  model <- h2o.deeplearning(
+    x = features,
+    y = target,
+    training_frame = train_h2o,
+    validation_frame = test_h2o, # 可选，如果有验证集
+    hidden = c(256, 128), # 隐藏层的节点数
+    activation = "RectifierWithDropout", # 使用带 Dropout 的激活函数
+    epochs = 50, # 训练轮次
+    hidden_dropout_ratios = c(0.2, 0.1), # 对应隐藏层的 Dropout 比例
+    l1 = 1e-5, # L1 正则化
+    l2 = 1e-5, # L2 正则化
+    balance_classes = TRUE # 处理类别不平衡
+  )
+  # 获取网格搜索结果
+  grid <- h2o.getGrid("dl_grid", sort_by = "auc", decreasing = TRUE)
+  
+  # 查看所有模型的ID和相应的AUC值
+  grid_results <- grid@summary_table
+  print(grid_results)
+  
+  
+  
+  
+  
+  # 获取AUC最高的模型的ID
+  best_model_id <- grid_results$model_ids[1]
+  
+  # 使用模型ID加载最佳模型
+  best_model <- h2o.getModel(best_model_id)
+  
+  # 查看最佳模型的详细信息
+  print(best_model)
+  # 网格搜索示例
+  grid <- h2o.grid(
+    algorithm = "deeplearning",
+    grid_id = "dl_grid",
+    hyper_params = list(
+      hidden = list(c(128, 64), c(256, 128), c(128, 128)),
+      rate = c(0.01, 0.001, 0.0001),
+      epochs = c(50, 100)
+    ),
+    search_criteria = list(strategy = "RandomDiscrete", max_models = 10),
+    training_frame = train_h2o,
+    validation_frame = test_h2o,
+    response_column = target,
+    x = features,
+    y = target
+  )
+  
+  # 获取最佳模型
+  best_model <- h2o.getGrid("dl_grid", sort_by = "auc", decreasing = TRUE)[[1]]
+  
+  # 打印模型概要
+  print(best_model)
+  print(model)
+  # 可视化网格搜索的超参数与AUC的关系
+  ggplot(grid_results, aes(x = as.factor(hidden), y = auc, color = as.factor(epochs), size = rate)) +
+    geom_point() +
+    labs(title = "Hyperparameter Tuning Results: AUC vs Hyperparameters",
+         x = "Hidden Layer Configuration",
+         y = "AUC",
+         color = "Epochs",
+         size = "Learning Rate") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))  # 使X轴标签倾斜
+  # 查看表格，选择感兴趣的列进行展示
+  print(grid_results[, c("hidden", "epochs", "rate", "auc")])
+  
+  # 转换数据为矩阵形式，便于绘制热图
+  install.packages("reshape2")
+  library(reshape2)
+  
+  # 将结果转化为宽格式
+  heatmap_data <- dcast(grid_results, hidden + epochs ~ rate, value.var = "auc")
+  # 查看转换后的数据
+  head(heatmap_data)
+  # 重命名列名为 rate_1e_04, rate_0_001, rate_0_01 等
+  colnames(heatmap_data)[3:ncol(heatmap_data)] <- c("rate_1e_04", "rate_0_001", "rate_0_01")
+  # 使用 ggplot2 绘制热图
+  ggplot(heatmap_data, aes(x = as.factor(rate_1e_04), 
+                           y = as.factor(hidden), 
+                           fill = `rate_1e_04`)) +
+    geom_tile(na.rm = TRUE) +  # 忽略 NA 值
+    scale_fill_gradient2(low = "red", high = "green", mid = "yellow", midpoint = 0.75, na.value = "grey") +  # 给 NA 值指定颜色
+    labs(title = "AUC Heatmap for Hyperparameter Tuning",
+         x = "Learning Rate",
+         y = "Hidden Layer Configuration") +
+    theme_minimal()
+  ggplot(heatmap_data, aes(x = as.factor(rate_0_001), 
+                           y = as.factor(hidden), 
+                           fill = `rate_0_001`)) +
+    geom_tile(na.rm = TRUE) +  # 忽略 NA 值
+    scale_fill_gradient2(low = "red", high = "green", mid = "yellow", midpoint = 0.75, na.value = "grey") +  # 给 NA 值指定颜色
+    labs(title = "AUC Heatmap for Hyperparameter Tuning",
+         x = "Learning Rate",
+         y = "Hidden Layer Configuration") +
+    theme_minimal()
+  
+  ggplot(heatmap_data, aes(x = as.factor(rate_0_01), 
+                           y = as.factor(hidden), 
+                           fill = `rate_0_01`)) +
+    geom_tile(na.rm = TRUE) +  # 忽略 NA 值
+    scale_fill_gradient2(low = "red", high = "green", mid = "yellow", midpoint = 0.75, na.value = "grey") +  # 给 NA 值指定颜色
+    labs(title = "AUC Heatmap for Hyperparameter Tuning",
+         x = "Learning Rate",
+         y = "Hidden Layer Configuration") +
+    theme_minimal()
+  # 预测训练集
+  train_predictions <- h2o.predict(model, train_h2o)
+  train_actuals <- as.factor(train_actuals)
+  # 确保 train_predictions$p1 是数值型
+  train_predictions$p1 <- as.numeric(train_predictions$p1)
+  
+  # 提取实际标签和预测结果
+  train_actuals <- as.vector(train_h2o[["YOD"]])
+  train_pred_labels <- as.vector(train_predictions$predict)
+  # 确保 `train_actuals` 是因子型
+  train_actuals <- as.factor(train_actuals)
+  # 确保 `train_predictions$p1` 是数值型
+  train_predictions$p1 <- as.numeric(train_predictions$p1)
+  # 将 H2OFrame 转换为 data.frame 并提取 p1 列
+  train_predictions_p1 <- as.numeric(as.data.frame(train_predictions$p1)[,1])
+  
+  # 确保 train_predictions_p1 是数值型
+  str(train_predictions_p1)
+  # 计算训练集的 ROC 曲线和 AUC
+  train_roc <- roc(train_actuals, train_predictions_p1)
+  train_auc <- auc(train_roc)
+  train_auc_ci <- ci.auc(train_roc)
+  # 计算训练集混淆矩阵
+  train_conf_matrix <- table(Predicted = train_pred_labels, Actual = train_actuals)
+  
+  # 使用 fourfoldplot 绘制训练集混淆矩阵
+  fourfoldplot(train_conf_matrix, color = c("#4DAF4A", "#984EA3"),
+               conf.level = 0, margin = 1, 
+               main = "Confusion Matrix - Training Data (MLP)")
+  
+  # 计算训练集 Accuracy
+  train_accuracy <- sum(diag(train_conf_matrix)) / sum(train_conf_matrix)
+  
+  # 计算训练集 Precision 和 Recall
+  train_precision <- train_conf_matrix["1", "1"] / sum(train_conf_matrix["1", ])
+  train_recall <- train_conf_matrix["1", "1"] / sum(train_conf_matrix[, "1"])
+  # 计算训练集 F1 Score
+  train_f1_score <- 2 * (train_precision * train_recall) / (train_precision + train_recall)
+  
+  # 打印训练集结果
+  print(paste("Training Accuracy: ", train_accuracy))
+  print(paste("Training Precision: ", train_precision))
+  print(paste("Training Recall: ", train_recall))
+  print(paste("Training F1 Score: ", train_f1_score))
+  print(paste("Training AUC: ", train_auc))
+  print(paste("Training AUC 95% CI: ", paste(train_auc_ci[1], "-", train_auc_ci[2])))
+  # 预测测试集
+  # 预测测试集
+  test_predictions <- h2o.predict(model, test_h2o)
+  # 将 H2OFrame 转换为普通数据框，并提取 p1 列
+  test_predictions_p1 <- as.numeric(as.data.frame(test_predictions$p1)[,1])
+  
+  # 提取测试集实际标签
+  test_actuals <- as.numeric(as.data.frame(test_h2o[,"YOD"])[,1])
+  str(test_actuals)
+  # 计算测试集的 ROC 曲线和 AUC
+  test_roc <- roc(test_actuals, test_predictions_p1)
+  library(pROC)
+  
+  # compute ROC
+  test_roc <- roc(response = test_actuals, predictor = test_predictions_p1)
+  
+  # explicitly use pROC::auc
+  test_auc <- pROC::auc(test_roc)
+  print(test_auc)
+  
+  
+  test_auc <- auc(test_roc)
+  test_auc_ci <- ci.auc(test_roc)
+  
+  # 提取实际标签和预测结果
+  actuals <- as.vector(test_h2o[["YOD"]])
+  pred_labels <- as.vector(test_predictions $predict)
+  
+  # 计算混淆矩阵
+  # 计算混淆矩阵
+  conf_matrix_test <- table(Predicted = pred_labels, Actual = actuals)
+  
+  # 使用 fourfoldplot 绘制测试集混淆矩阵
+  fourfoldplot(conf_matrix_test, color = c("#4DAF4A", "#984EA3"),
+               conf.level = 0, margin = 1, 
+               main = "Confusion Matrix - Testing Data (MLP)")
+  accuracy_test <- sum(diag(conf_matrix_test)) / sum(conf_matrix_test)
+  # 计算 Precision 和 Recall
+  precision_test <- conf_matrix_test["1", "1"] / sum(conf_matrix_test["1", ])
+  recall_test <- conf_matrix_test["1", "1"] / sum(conf_matrix_test[, "1"])
+  
+  # 计算 F1 Score
+  # 计算测试集 F1 Score
+  test_f1_score <- 2 * (precision_test * recall_test) / (precision_test + recall_test)
+  
+  # 打印结果
+  print(paste("Testing Accuracy: ", accuracy_test))
+  print(paste("Testing Precision: ", precision_test))
+  print(paste("Testing Recall: ", recall_test))
+  print(paste("Testing F1 Score: ", test_f1_score))
+  print(paste("Testing AUC: ", test_auc))
+  print(paste("Testing AUC 95% CI: ", paste(test_auc_ci[1], "-", test_auc_ci[2])))
+  
+  # 预测训练集
+  train_predictions <- h2o.predict(model, train_h2o)
+  train_actuals <- as.factor(as.data.frame(train_h2o[,"YOD"])[,1])
+  
+  # 提取训练集预测的概率（p1 列），并确保其为数值型
+  train_predictions_p1 <- as.numeric(as.data.frame(train_predictions$p1)[,1])
+  
+  # 计算训练集的 ROC 曲线和 AUC
+  roc_train_h2o <- roc(train_actuals, train_predictions_p1, ci = TRUE)
+  ci_train <- ci.auc(roc_train_h2o)
+  
+  # 预测测试集
+  test_predictions <- h2o.predict(model, test_h2o)
+  
+  # 提取测试集预测的概率（p1 列）
+  test_predictions_p1 <- as.numeric(as.data.frame(test_predictions$p1)[,1])
+  
+  # 提取测试集的实际标签
+  test_actuals <- as.factor(as.data.frame(test_h2o[,"YOD"])[,1])
+  
+  # 计算测试集的 ROC 曲线和 AUC
+  roc_test_h2o <- roc(test_actuals, test_predictions_p1, ci = TRUE)
+  ci_test <- ci.auc(roc_test_h2o)
+  
+  # 输出 AUC 和置信区间（训练集和测试集）
+  print(paste0("训练集 AUC (95%CI): ", sprintf("%0.3f", roc_train_h2o$auc), 
+               " (", sprintf("%0.3f", ci_train[1]), " - ",
+               sprintf("%0.3f", ci_train[3]), ")"), quote = FALSE)
+  print(paste0("测试集 AUC (95%CI): ", sprintf("%0.3f", roc_test_h2o$auc), 
+               " (", sprintf("%0.3f", ci_test[1]), " - ",
+               sprintf("%0.3f", ci_test[3]), ")"), quote = FALSE)
+  
+  # 绘制训练集 ROC 曲线
+  plot(roc_train_h2o, print.auc = TRUE, 
+       auc.polygon = TRUE, 
+       grid = c(0.1, 0.2), 
+       grid.col = c("green", "red"), 
+       max.auc.polygon = TRUE,
+       auc.polygon.col = "skyblue",
+       print.thres = TRUE,
+       main = "ROC Curve for Training Data (MLP)",
+       col = "blue",  # ROC 曲线的颜色
+       lwd = 2)       # ROC 曲线的线宽
+  
+  # 绘制测试集 ROC 曲线
+  plot(roc_test_h2o, print.auc = TRUE, 
+       auc.polygon = TRUE, 
+       grid = c(0.1, 0.2), 
+       grid.col = c("green", "red"), 
+       max.auc.polygon = TRUE,
+       auc.polygon.col = "skyblue",
+       print.thres = TRUE,
+       main = "ROC Curve for Testing Data (MLP)",
+       col = "blue",  # ROC 曲线的颜色
+       lwd = 2)       # ROC 曲线的线宽
+  
+  
+
+
+
+
